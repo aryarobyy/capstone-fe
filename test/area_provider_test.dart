@@ -89,6 +89,52 @@ void main() {
     expect(provider.sensors, isEmpty);
   });
 
+  test('updateArea rewrites the area in place', () async {
+    final provider = _providerWith((_) async => http.Response(_areaList, 200));
+    await provider.fetchAreas();
+
+    final ok = await provider.updateArea(
+      id: 1,
+      name: 'Area Ubah',
+      location: 'Blok B',
+    );
+
+    expect(ok, isTrue);
+    expect(provider.areas.single.id, 1);
+    expect(provider.areas.single.name, 'Area Ubah');
+    expect(provider.areas.single.location, 'Blok B');
+  });
+
+  test('deleteArea also drops its sensors and resets the filter', () async {
+    final provider = _providerWith(
+      (req) async => req.url.path.endsWith('/sensor/list')
+          ? http.Response(_sensorList, 200)
+          : http.Response(_areaList, 200),
+    );
+    await provider.fetchAreas();
+    await provider.fetchSensors(areaId: 1);
+    expect(provider.sensors, hasLength(1));
+
+    final ok = await provider.deleteArea(1);
+
+    expect(ok, isTrue);
+    expect(provider.areas, isEmpty);
+    expect(provider.totalAreas, 0);
+    expect(provider.sensors, isEmpty);
+    expect(provider.totalSensors, 0);
+    expect(provider.sensorAreaFilter, isNull);
+  });
+
+  test('area mutations on an unknown id fail loudly', () async {
+    final provider = _providerWith((_) async => http.Response('[]', 200));
+    await provider.fetchAreas();
+
+    expect(await provider.updateArea(id: 99, name: 'x'), isFalse);
+    expect(provider.errorMessage, 'Area tidak ditemukan.');
+    expect(await provider.deleteArea(99), isFalse);
+    expect(provider.errorMessage, 'Area tidak ditemukan.');
+  });
+
   test('unauthenticated bare-JSON error body is reported', () async {
     final provider = _providerWith(
       (_) async => http.Response('{"error":"valid access token required"}', 401),

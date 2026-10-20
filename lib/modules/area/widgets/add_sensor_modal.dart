@@ -240,7 +240,7 @@ class _AddSensorModalState extends State<AddSensorModal> {
                 ),
                 const SizedBox(height: 32),
                 AppButton(
-                  text: "Simpan Sensor",
+                  text: _isEdit ? "Perbarui Sensor" : "Simpan Sensor",
                   onPressed: provider.isSaving ? null : _submit,
                   isLoading: provider.isSaving,
                   backgroundColor: AppColors.areaAccent,

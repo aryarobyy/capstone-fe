@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../utils/colorScheme.dart';
 import '../../../widgets/app_button.dart';
 import '../providers/area_provider.dart';
+import '../models/area_model.dart';
 import '../models/sensor_model.dart';
 import '../widgets/area_card.dart';
 import '../widgets/sensor_card.dart';
@@ -31,24 +32,26 @@ class _AreaScreenState extends State<AreaScreen> {
 
   Future<void> _refresh() => context.read<AreaProvider>().loadAll();
 
-  Future<void> _openModal(Widget modal) async {
+  /// [refresh] is off for area edits: that change lives only in the provider,
+  /// so re-fetching would throw it away.
+  Future<void> _openModal(Widget modal, {bool refresh = true}) async {
     final saved = await showDialog<bool>(
       context: context,
       builder: (_) => modal,
     );
-    if (saved == true && mounted) {
+    if (saved == true && refresh && mounted) {
       await _refresh();
     }
   }
 
-  Future<void> _confirmDelete(SensorModel sensor) async {
+  /// Shared confirmation sheet for both destructive actions.
+  Future<bool> _askDelete({required String title, required String label}) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text("Hapus Sensor"),
+        title: Text(title),
         content: Text(
-          "Hapus sensor \"${sensor.name.isNotEmpty ? sensor.name : sensor.code}\"? "
-          "Tindakan ini tidak dapat dibatalkan.",
+          "Hapus \"$label\"? Tindakan ini tidak dapat dibatalkan.",
         ),
         actions: [
           TextButton(
@@ -66,10 +69,15 @@ class _AreaScreenState extends State<AreaScreen> {
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    return confirmed == true && mounted;
+  }
 
+  Future<void> _deleteSensor(SensorModel sensor) async {
     final provider = context.read<AreaProvider>();
     final messenger = ScaffoldMessenger.of(context);
+    final label = sensor.name.isNotEmpty ? sensor.name : sensor.code;
+
+    if (!await _askDelete(title: "Hapus Sensor", label: label)) return;
     final success = await provider.deleteSensor(sensor.id);
 
     messenger.showSnackBar(
@@ -78,6 +86,26 @@ class _AreaScreenState extends State<AreaScreen> {
           success
               ? "Sensor berhasil dihapus"
               : provider.errorMessage ?? "Gagal menghapus sensor",
+        ),
+        backgroundColor: success ? AppColors.success : AppColors.error,
+      ),
+    );
+  }
+
+  Future<void> _deleteArea(AreaModel area) async {
+    final provider = context.read<AreaProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final label = area.name.isNotEmpty ? area.name : "Area ${area.id}";
+
+    if (!await _askDelete(title: "Hapus Area", label: label)) return;
+    final success = await provider.deleteArea(area.id);
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? "Area berhasil dihapus"
+              : provider.errorMessage ?? "Gagal menghapus area",
         ),
         backgroundColor: success ? AppColors.success : AppColors.error,
       ),
@@ -138,7 +166,13 @@ class _AreaScreenState extends State<AreaScreen> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<int>(
-                        value: areaProvider.sensorAreaFilter ?? 0,
+                        // Deleting the filtered area drops its id from `areas`,
+                        // so fall back to the sentinel to avoid an assertion.
+                        value: areaProvider.areas.any(
+                          (a) => a.id == areaProvider.sensorAreaFilter,
+                        )
+                            ? areaProvider.sensorAreaFilter
+                            : 0,
                         hint: const Text(
                           "Area",
                           style: TextStyle(
@@ -263,13 +297,18 @@ class _AreaScreenState extends State<AreaScreen> {
           padding: const EdgeInsets.only(bottom: 12.0),
           child: AreaCard(
             area: area,
-            sensorsCount: provider.sensorAreaFilter == null
-                ? provider.sensorCountOf(area.id)
-                : null,
+            sensorsCount: provider.sensorCountOf(area.id),
             onDetailTap: () {
               setState(() => _selectedChipIndex = 1);
               provider.fetchSensors(areaId: area.id);
             },
+            // ponytail: area edits/deletes stay in the provider until
+            // `/areas/update|delete` exist, hence refresh: false.
+            onEdit: () => _openModal(
+              AddAreaModal(area: area),
+              refresh: false,
+            ),
+            onDelete: () => _deleteArea(area),
           ),
         );
       },
@@ -293,7 +332,7 @@ class _AreaScreenState extends State<AreaScreen> {
           sensor: sensor,
           areaName: provider.areaNameOf(sensor.areaId),
           onEdit: () => _openModal(AddSensorModal(sensor: sensor)),
-          onDelete: () => _confirmDelete(sensor),
+          onDelete: () => _deleteSensor(sensor),
         );
       },
     );

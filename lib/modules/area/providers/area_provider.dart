@@ -130,6 +130,56 @@ class AreaProvider extends ChangeNotifier {
     }
   }
 
+  /// ponytail: local-only edit. `/areas/update` returns 404 today, so this just
+  /// rewrites the in-memory area. Swap the body for an
+  /// `areaService.updateArea(...)` call once that route ships — the UI already
+  /// passes every field the backend will need.
+  Future<bool> updateArea({
+    required int id,
+    required String name,
+    String? description,
+    String? location,
+  }) async {
+    final idx = _areas.indexWhere((a) => a.id == id);
+    if (idx < 0) {
+      _errorMessage = 'Area tidak ditemukan.';
+      notifyListeners();
+      return false;
+    }
+
+    _areas[idx] = _areas[idx].copyWith(
+      name: name,
+      description: description,
+      location: location,
+    );
+    _errorMessage = null;
+    notifyListeners();
+    return true;
+  }
+
+  /// ponytail: local-only delete, same reason as [updateArea].
+  Future<bool> deleteArea(int id) async {
+    final before = _areas.length;
+    _areas.removeWhere((a) => a.id == id);
+
+    if (_areas.length == before) {
+      _errorMessage = 'Area tidak ditemukan.';
+      notifyListeners();
+      return false;
+    }
+
+    _totalAreas = _areas.length;
+    // Sensors of a removed area must not stay on screen or in the filter.
+    _sensors.removeWhere((s) => s.areaId == id);
+    _totalSensors = _sensors.length;
+    if (_sensorAreaFilter == id) {
+      _sensorAreaFilter = null;
+    }
+    _errorMessage = null;
+    notifyListeners();
+    return true;
+  }
+
   Future<void> fetchSensors({int? areaId, int limit = 20, int index = 0}) async {
     _sensorAreaFilter = areaId;
     _isLoading = true;

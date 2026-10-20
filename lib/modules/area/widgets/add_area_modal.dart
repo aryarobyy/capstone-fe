@@ -4,9 +4,13 @@ import '../../../utils/colorScheme.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/app_text_field.dart';
 import '../providers/area_provider.dart';
+import '../models/area_model.dart';
 
 class AddAreaModal extends StatefulWidget {
-  const AddAreaModal({super.key});
+  /// When provided the modal edits that area instead of creating a new one.
+  final AreaModel? area;
+
+  const AddAreaModal({super.key, this.area});
 
   @override
   State<AddAreaModal> createState() => _AddAreaModalState();
@@ -17,6 +21,19 @@ class _AddAreaModalState extends State<AddAreaModal> {
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
+
+  bool get _isEdit => widget.area != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final area = widget.area;
+    if (area != null) {
+      _nameController.text = area.name;
+      _locationController.text = area.location ?? '';
+      _descriptionController.text = area.description ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -35,24 +52,36 @@ class _AddAreaModalState extends State<AddAreaModal> {
     final location = _locationController.text.trim();
     final description = _descriptionController.text.trim();
 
-    final success = await provider.createArea(
-      name: _nameController.text.trim(),
-      location: location.isNotEmpty ? location : null,
-      description: description.isNotEmpty ? description : null,
-    );
+    final success = _isEdit
+        ? await provider.updateArea(
+            id: widget.area!.id,
+            name: _nameController.text.trim(),
+            location: location.isNotEmpty ? location : null,
+            description: description.isNotEmpty ? description : null,
+          )
+        : await provider.createArea(
+            name: _nameController.text.trim(),
+            location: location.isNotEmpty ? location : null,
+            description: description.isNotEmpty ? description : null,
+          );
 
     if (success) {
       navigator.pop(true);
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text("Berhasil menambahkan area"),
+        SnackBar(
+          content: Text(
+            _isEdit ? "Berhasil memperbarui area" : "Berhasil menambahkan area",
+          ),
           backgroundColor: AppColors.success,
         ),
       );
     } else {
       messenger.showSnackBar(
         SnackBar(
-          content: Text(provider.errorMessage ?? "Gagal menambahkan area"),
+          content: Text(
+            provider.errorMessage ??
+                (_isEdit ? "Gagal memperbarui area" : "Gagal menambahkan area"),
+          ),
           backgroundColor: AppColors.error,
         ),
       );
@@ -81,9 +110,9 @@ class _AddAreaModalState extends State<AddAreaModal> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      "Tambah Area",
-                      style: TextStyle(
+                    Text(
+                      _isEdit ? "Edit Area" : "Tambah Area",
+                      style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -124,7 +153,7 @@ class _AddAreaModalState extends State<AddAreaModal> {
                 ),
                 const SizedBox(height: 32),
                 AppButton(
-                  text: "Simpan Area",
+                  text: _isEdit ? "Perbarui Area" : "Simpan Area",
                   onPressed: provider.isSaving ? null : _submit,
                   isLoading: provider.isSaving,
                   backgroundColor: AppColors.areaAccent,

@@ -7,6 +7,8 @@ import '../models/area_model.dart';
 class AreaCard extends StatelessWidget {
   final AreaModel area;
   final VoidCallback? onDetailTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   /// Sensor count to display. Falls back to `area.sensorsCount` when null.
   final int? sensorsCount;
@@ -15,6 +17,8 @@ class AreaCard extends StatelessWidget {
     super.key,
     required this.area,
     this.onDetailTap,
+    this.onEdit,
+    this.onDelete,
     this.sensorsCount,
   });
 
@@ -82,6 +86,46 @@ class AreaCard extends StatelessWidget {
               ),
             ],
           ),
+          // Action Buttons (Edit & Delete), same treatment as SensorCard.
+          if (onEdit != null || onDelete != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (onEdit != null)
+                  Expanded(
+                    child: AppButton(
+                      text: "Edit",
+                      onPressed: onEdit!,
+                      backgroundColor: AppColors.actionEdit,
+                      textColor: AppColors.textPrimary,
+                      borderRadius: 16.0,
+                      elevation: 0,
+                      height: 32.0,
+                      fontSize: 12.0,
+                      fontWeight: FontWeight.w700,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                if (onEdit != null && onDelete != null)
+                  const SizedBox(width: 8),
+                if (onDelete != null)
+                  Expanded(
+                    child: AppButton(
+                      text: "Delete",
+                      onPressed: onDelete!,
+                      backgroundColor: AppColors.actionDelete,
+                      textColor: Colors.white,
+                      borderRadius: 16.0,
+                      elevation: 0,
+                      height: 32.0,
+                      fontSize: 12.0,
+                      fontWeight: FontWeight.w700,
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
