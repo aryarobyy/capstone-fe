@@ -20,15 +20,17 @@ class AuthService {
     );
   }
 
-  Future<ApiResponse<AuthResponseData>> register(RegisterRequest request) async {
+  /// Register only creates the account; the backend returns the user
+  /// without tokens, so the user still has to log in afterwards.
+  Future<ApiResponse<UserAuthModel>> register(RegisterRequest request) async {
     final responseMap = await rpcClient.call(
       procedure: ApiEndpoints.authRegister,
       params: request.toJson(),
     );
 
-    return ApiResponse<AuthResponseData>.fromJson(
+    return ApiResponse<UserAuthModel>.fromJson(
       responseMap,
-      (data) => AuthResponseData.fromJson(data as Map<String, dynamic>),
+      (data) => UserAuthModel.fromJson(data as Map<String, dynamic>),
     );
   }
 

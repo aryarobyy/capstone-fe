@@ -36,18 +36,20 @@ class MockAuthService extends AuthService {
   }
 
   @override
-  Future<ApiResponse<AuthResponseData>> register(RegisterRequest request) async {
+  Future<ApiResponse<UserAuthModel>> register(RegisterRequest request) async {
     if (shouldSucceed) {
-      return ApiResponse<AuthResponseData>(
+      return ApiResponse<UserAuthModel>(
         success: true,
         message: 'Registrasi berhasil',
-        data: AuthResponseData(
-          accessToken: 'mock_token',
-          user: UserAuthModel(id: 1, name: request.name, email: request.email),
+        data: UserAuthModel(
+          id: 1,
+          name: request.name,
+          email: request.email,
+          msisdn: request.msisdn,
         ),
       );
     } else {
-      return ApiResponse<AuthResponseData>(
+      return ApiResponse<UserAuthModel>(
         success: false,
         message: mockErrorMessage ?? 'Email sudah terdaftar',
       );
@@ -95,6 +97,7 @@ void main() {
       // Form labels
       expect(find.text('Nama Lengkap'), findsOneWidget);
       expect(find.text('Alamat Email'), findsOneWidget);
+      expect(find.text('Nomor HP / WhatsApp'), findsOneWidget);
       expect(find.text('Kata Sandi'), findsOneWidget);
       expect(find.text('Konfirmasi Kata Sandi'), findsOneWidget);
 
@@ -123,20 +126,23 @@ void main() {
       await tester.pumpAndSettle();
 
       final textFields = find.byType(TextFormField);
-      expect(textFields, findsNWidgets(4));
+      expect(textFields, findsNWidgets(5));
 
       // Fill in fields
       await tester.enterText(textFields.at(0), 'Pak Tani');
       await tester.enterText(textFields.at(1), 'paktani@gmail.com');
-      await tester.enterText(textFields.at(2), 'password123');
+      await tester.enterText(textFields.at(2), '081234567890');
       await tester.enterText(textFields.at(3), 'password123');
+      await tester.enterText(textFields.at(4), 'password123');
 
       await tester.ensureVisible(find.text('Daftar Sekarang'));
       await tester.tap(find.text('Daftar Sekarang'));
       await tester.pumpAndSettle();
 
-      expect(authProvider.isAuthenticated, isTrue);
+      // Register issues no token, so the user is not authenticated yet.
+      expect(authProvider.isAuthenticated, isFalse);
       expect(authProvider.currentUser?.name, 'Pak Tani');
+      expect(authProvider.currentUser?.msisdn, '081234567890');
     });
   });
 

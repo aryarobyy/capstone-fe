@@ -69,7 +69,9 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _errorMessage = response.message;
+        _errorMessage = response.errors.isNotEmpty
+            ? '${response.message} ${response.errors.join(", ")}'
+            : response.message;
         _isLoading = false;
         notifyListeners();
         return false;
@@ -87,27 +89,37 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> register(String name, String email, String password) async {
+  Future<bool> register(
+    String name,
+    String email,
+    String msisdn,
+    String password,
+  ) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
       final response = await authService.register(
-        RegisterRequest(name: name, email: email, password: password),
+        RegisterRequest(
+          name: name,
+          email: email,
+          msisdn: msisdn,
+          password: password,
+        ),
       );
 
-      if (response.success && response.data != null) {
-        _accessToken = response.data!.accessToken;
-        _refreshToken = response.data!.refreshToken;
-        rpcClient.token = _accessToken;
-        _currentUser = response.data!.user;
-        _isLoading = false;
+      _isLoading = false;
+
+      if (response.success) {
+        // Backend issues no token on register; user logs in separately.
+        _currentUser = response.data;
         notifyListeners();
         return true;
       } else {
-        _errorMessage = response.message;
-        _isLoading = false;
+        _errorMessage = response.errors.isNotEmpty
+            ? '${response.message} ${response.errors.join(", ")}'
+            : response.message;
         notifyListeners();
         return false;
       }

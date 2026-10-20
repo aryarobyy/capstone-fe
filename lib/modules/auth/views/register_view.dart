@@ -26,6 +26,7 @@ class _RegisterViewState extends State<RegisterView> {
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _msisdnController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -36,6 +37,7 @@ class _RegisterViewState extends State<RegisterView> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _msisdnController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -53,6 +55,7 @@ class _RegisterViewState extends State<RegisterView> {
     final registerRequest = RegisterRequest(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
+      msisdn: _msisdnController.text.trim(),
       password: _passwordController.text,
     );
 
@@ -60,6 +63,7 @@ class _RegisterViewState extends State<RegisterView> {
     final success = await authProvider.register(
       registerRequest.name,
       registerRequest.email,
+      registerRequest.msisdn,
       registerRequest.password,
     );
 
@@ -68,7 +72,7 @@ class _RegisterViewState extends State<RegisterView> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Pendaftaran berhasil! Selamat datang di TaniPintar.'),
+          content: Text('Pendaftaran berhasil! Silakan masuk dengan akun Anda.'),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
@@ -178,7 +182,28 @@ class _RegisterViewState extends State<RegisterView> {
                           ),
                           const SizedBox(height: 16.0),
 
-                          // 3. Kata Sandi Field
+                          // 3. Nomor HP / WhatsApp Field (msisdn, wajib oleh API)
+                          AppTextField(
+                            label: 'Nomor HP / WhatsApp',
+                            hintText: '08...',
+                            prefixIcon: Icons.phone_android_rounded,
+                            controller: _msisdnController,
+                            keyboardType: TextInputType.phone,
+                            textInputAction: TextInputAction.next,
+                            validator: (value) {
+                              final msisdn = value?.trim() ?? '';
+                              if (msisdn.isEmpty) {
+                                return 'Nomor HP wajib diisi';
+                              }
+                              if (!RegExp(r'^(\+62|62|0)8[0-9]{7,12}$').hasMatch(msisdn)) {
+                                return 'Format nomor HP tidak valid';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16.0),
+
+                          // 4. Kata Sandi Field
                           AppTextField(
                             label: 'Kata Sandi',
                             hintText: 'Minimal 6 karakter',
@@ -212,7 +237,7 @@ class _RegisterViewState extends State<RegisterView> {
                           ),
                           const SizedBox(height: 16.0),
 
-                          // 4. Konfirmasi Kata Sandi Field
+                          // 5. Konfirmasi Kata Sandi Field
                           AppTextField(
                             label: 'Konfirmasi Kata Sandi',
                             hintText: 'Ulangi kata sandi Anda',

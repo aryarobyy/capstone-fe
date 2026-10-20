@@ -2,11 +2,13 @@ class UserAuthModel {
   final int id;
   final String name;
   final String email;
+  final String msisdn;
 
   const UserAuthModel({
     required this.id,
     required this.name,
     required this.email,
+    this.msisdn = '',
   });
 
   factory UserAuthModel.fromJson(Map<String, dynamic> json) {
@@ -14,6 +16,7 @@ class UserAuthModel {
       id: json['id'] as int? ?? 0,
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
+      msisdn: json['msisdn'] as String? ?? '',
     );
   }
 
@@ -22,6 +25,7 @@ class UserAuthModel {
       'id': id,
       'name': name,
       'email': email,
+      'msisdn': msisdn,
     };
   }
 }
@@ -37,12 +41,15 @@ class AuthResponseData {
     required this.user,
   });
 
+  /// Backend returns the user fields flat alongside the tokens
+  /// (see POST /api/auth/login), so fall back to the root object when
+  /// no nested `user` key is present.
   factory AuthResponseData.fromJson(Map<String, dynamic> json) {
     return AuthResponseData(
       accessToken: json['access_token'] as String? ?? '',
       refreshToken: json['refresh_token'] as String?,
       user: UserAuthModel.fromJson(
-        json['user'] as Map<String, dynamic>? ?? {},
+        json['user'] as Map<String, dynamic>? ?? json,
       ),
     );
   }
@@ -76,11 +83,13 @@ class LoginRequest {
 class RegisterRequest {
   final String name;
   final String email;
+  final String msisdn;
   final String password;
 
   const RegisterRequest({
     required this.name,
     required this.email,
+    required this.msisdn,
     required this.password,
   });
 
@@ -88,6 +97,7 @@ class RegisterRequest {
     return {
       'name': name,
       'email': email,
+      'msisdn': msisdn,
       'password': password,
     };
   }
