@@ -82,22 +82,31 @@ class RpcClient {
       );
 
       final body = response.body.trim();
-      final decoded = body.isEmpty ? null : jsonDecode(body);
-      final asMap = decoded is Map<String, dynamic> ? decoded : null;
+      final ok = response.statusCode >= 200 && response.statusCode < 300;
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
-      } else {
-        throw RpcException(
-          statusCode: response.statusCode,
-          message: asMap?['message'] as String? ??
-              asMap?['error'] as String? ??
-              'Terjadi kesalahan pada server.',
-          errors: asMap?['errors'] is List
-              ? List<String>.from(asMap!['errors'] as List)
-              : const [],
-        );
+      if (ok) {
+        return body.isEmpty ? null : jsonDecode(body);
       }
+
+      // Error bodies are not always JSON (e.g. Go's plain "404 page not found"),
+      // so keep the status code instead of failing to decode.
+      Map<String, dynamic>? asMap;
+      try {
+        final decoded = body.isEmpty ? null : jsonDecode(body);
+        if (decoded is Map<String, dynamic>) asMap = decoded;
+      } on FormatException {
+        asMap = null;
+      }
+
+      throw RpcException(
+        statusCode: response.statusCode,
+        message: asMap?['message'] as String? ??
+            asMap?['error'] as String? ??
+            'Terjadi kesalahan pada server.',
+        errors: asMap?['errors'] is List
+            ? List<String>.from(asMap!['errors'] as List)
+            : const [],
+      );
     } on http.ClientException catch (e) {
       throw RpcException(
         statusCode: 0,

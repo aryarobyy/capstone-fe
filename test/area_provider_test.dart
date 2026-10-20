@@ -89,8 +89,14 @@ void main() {
     expect(provider.sensors, isEmpty);
   });
 
-  test('updateArea rewrites the area in place', () async {
-    final provider = _providerWith((_) async => http.Response(_areaList, 200));
+  test('updateArea posts to /areas/update and patches the area', () async {
+    final requests = <http.Request>[];
+    final provider = _providerWith(
+      (req) async => req.url.path.endsWith('/areas/update')
+          ? http.Response('', 204)
+          : http.Response(_areaList, 200),
+      seen: requests,
+    );
     await provider.fetchAreas();
 
     final ok = await provider.updateArea(
@@ -100,16 +106,29 @@ void main() {
     );
 
     expect(ok, isTrue);
-    expect(provider.areas.single.id, 1);
+    expect(requests.last.url.path, endsWith('/areas/update'));
+    expect(jsonDecode(requests.last.body), {
+      'id': 1,
+      'name': 'Area Ubah',
+      'location': 'Blok B',
+    });
     expect(provider.areas.single.name, 'Area Ubah');
     expect(provider.areas.single.location, 'Blok B');
   });
 
-  test('deleteArea also drops its sensors and resets the filter', () async {
+  test('deleteArea drops the area, its sensors and the filter', () async {
+    final requests = <http.Request>[];
     final provider = _providerWith(
-      (req) async => req.url.path.endsWith('/sensor/list')
-          ? http.Response(_sensorList, 200)
-          : http.Response(_areaList, 200),
+      (req) async {
+        if (req.url.path.endsWith('/sensor/list')) {
+          return http.Response(_sensorList, 200);
+        }
+        if (req.url.path.endsWith('/areas/delete')) {
+          return http.Response('', 204);
+        }
+        return http.Response(_areaList, 200);
+      },
+      seen: requests,
     );
     await provider.fetchAreas();
     await provider.fetchSensors(areaId: 1);
@@ -118,11 +137,30 @@ void main() {
     final ok = await provider.deleteArea(1);
 
     expect(ok, isTrue);
+    expect(requests.last.url.path, endsWith('/areas/delete'));
+    expect(jsonDecode(requests.last.body), {'id': 1});
     expect(provider.areas, isEmpty);
     expect(provider.totalAreas, 0);
     expect(provider.sensors, isEmpty);
     expect(provider.totalSensors, 0);
     expect(provider.sensorAreaFilter, isNull);
+  });
+
+  test('a 404 on area update/delete keeps the list and explains why', () async {
+    final provider = _providerWith(
+      (req) async => req.url.path.endsWith('/areas/list')
+          ? http.Response(_areaList, 200)
+          : http.Response('404 page not found', 404),
+    );
+    await provider.fetchAreas();
+
+    expect(await provider.updateArea(id: 1, name: 'Area Ubah'), isFalse);
+    expect(provider.errorMessage, 'Ubah area belum tersedia di server.');
+    expect(provider.areas.single.name, 'Area Uji');
+
+    expect(await provider.deleteArea(1), isFalse);
+    expect(provider.errorMessage, 'Hapus area belum tersedia di server.');
+    expect(provider.areas, hasLength(1));
   });
 
   test('area mutations on an unknown id fail loudly', () async {

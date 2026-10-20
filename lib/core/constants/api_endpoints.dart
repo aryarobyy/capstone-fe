@@ -15,13 +15,15 @@ class ApiEndpoints {
   static const String alertRuleList = '/sensor-rule/list';
   static const String alertRuleSave = '/sensor-rule/save';
 
-  static const String areaList = '/area/list';
-  static const String areaDetail = '/area/detail';
-  static const String areaCreate = '/area/create';
-  static const String areaUpdate = '/area/update';
-  static const String areaDelete = '/area/delete';
+  // Area routes are plural and answer with bare JSON, not the usual envelope:
+  //   /areas/list   -> [{"id":1,"name":"Area Uji"}]
+  //   /areas/create -> {"id":7} (201)
+  // `/areas/update` and `/areas/delete` are declared but still 404 on the
+  // server; AreaService maps that to a "belum tersedia" message.
   static const String areaList = '/areas/list';
   static const String areaCreate = '/areas/create';
+  static const String areaUpdate = '/areas/update';
+  static const String areaDelete = '/areas/delete';
 
   static const String sensorList = '/sensor/list';
   static const String sensorDetail = '/sensor/detail';

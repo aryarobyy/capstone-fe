@@ -130,10 +130,8 @@ class AreaProvider extends ChangeNotifier {
     }
   }
 
-  /// ponytail: local-only edit. `/areas/update` returns 404 today, so this just
-  /// rewrites the in-memory area. Swap the body for an
-  /// `areaService.updateArea(...)` call once that route ships — the UI already
-  /// passes every field the backend will need.
+  /// `/areas/update` returns no body, so the local area is patched with the
+  /// values we just sent once the server accepts them.
   Future<bool> updateArea({
     required int id,
     required String name,
@@ -147,37 +145,69 @@ class AreaProvider extends ChangeNotifier {
       return false;
     }
 
-    _areas[idx] = _areas[idx].copyWith(
-      name: name,
-      description: description,
-      location: location,
-    );
+    _isSaving = true;
     _errorMessage = null;
     notifyListeners();
-    return true;
+
+    try {
+      await areaService.updateArea(
+        id: id,
+        name: name,
+        description: description,
+        location: location,
+      );
+
+      _areas[idx] = _areas[idx].copyWith(
+        name: name,
+        description: description,
+        location: location,
+      );
+      return true;
+    } on RpcException catch (e) {
+      _errorMessage = e.toString();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Gagal memperbarui lahan: $e';
+      return false;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
   }
 
-  /// ponytail: local-only delete, same reason as [updateArea].
   Future<bool> deleteArea(int id) async {
-    final before = _areas.length;
-    _areas.removeWhere((a) => a.id == id);
-
-    if (_areas.length == before) {
+    if (!_areas.any((a) => a.id == id)) {
       _errorMessage = 'Area tidak ditemukan.';
       notifyListeners();
       return false;
     }
 
-    _totalAreas = _areas.length;
-    // Sensors of a removed area must not stay on screen or in the filter.
-    _sensors.removeWhere((s) => s.areaId == id);
-    _totalSensors = _sensors.length;
-    if (_sensorAreaFilter == id) {
-      _sensorAreaFilter = null;
-    }
+    _isDeleting = true;
     _errorMessage = null;
     notifyListeners();
-    return true;
+
+    try {
+      await areaService.deleteArea(id);
+
+      _areas.removeWhere((a) => a.id == id);
+      _totalAreas = _areas.length;
+      // Sensors of a removed area must not stay on screen or in the filter.
+      _sensors.removeWhere((s) => s.areaId == id);
+      _totalSensors = _sensors.length;
+      if (_sensorAreaFilter == id) {
+        _sensorAreaFilter = null;
+      }
+      return true;
+    } on RpcException catch (e) {
+      _errorMessage = e.toString();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Gagal menghapus lahan: $e';
+      return false;
+    } finally {
+      _isDeleting = false;
+      notifyListeners();
+    }
   }
 
   Future<void> fetchSensors({int? areaId, int limit = 20, int index = 0}) async {

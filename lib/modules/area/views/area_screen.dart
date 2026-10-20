@@ -32,14 +32,13 @@ class _AreaScreenState extends State<AreaScreen> {
 
   Future<void> _refresh() => context.read<AreaProvider>().loadAll();
 
-  /// [refresh] is off for area edits: that change lives only in the provider,
-  /// so re-fetching would throw it away.
-  Future<void> _openModal(Widget modal, {bool refresh = true}) async {
+  /// Re-reads both lists from the API after a successful create or update.
+  Future<void> _openModal(Widget modal) async {
     final saved = await showDialog<bool>(
       context: context,
       builder: (_) => modal,
     );
-    if (saved == true && refresh && mounted) {
+    if (saved == true && mounted) {
       await _refresh();
     }
   }
@@ -302,12 +301,7 @@ class _AreaScreenState extends State<AreaScreen> {
               setState(() => _selectedChipIndex = 1);
               provider.fetchSensors(areaId: area.id);
             },
-            // ponytail: area edits/deletes stay in the provider until
-            // `/areas/update|delete` exist, hence refresh: false.
-            onEdit: () => _openModal(
-              AddAreaModal(area: area),
-              refresh: false,
-            ),
+            onEdit: () => _openModal(AddAreaModal(area: area)),
             onDelete: () => _deleteArea(area),
           ),
         );
