@@ -8,10 +8,14 @@ class AreaCard extends StatelessWidget {
   final AreaModel area;
   final VoidCallback? onDetailTap;
 
+  /// Sensor count to display. Falls back to `area.sensorsCount` when null.
+  final int? sensorsCount;
+
   const AreaCard({
     super.key,
     required this.area,
     this.onDetailTap,
+    this.sensorsCount,
   });
 
   @override
@@ -58,7 +62,11 @@ class AreaCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildMetricItem(Icons.sensors, "Total Sensor", "${area.sensorsCount}"),
+              _buildMetricItem(
+                Icons.sensors,
+                "Total Sensor",
+                "${sensorsCount ?? area.sensorsCount}",
+              ),
               AppButton(
                 text: "Detail",
                 onPressed: onDetailTap ?? () {},

@@ -15,11 +15,12 @@ class ApiEndpoints {
   static const String alertRuleList = '/sensor-rule/list';
   static const String alertRuleSave = '/sensor-rule/save';
 
-  static const String areaList = '/area/list';
-  static const String areaDetail = '/area/detail';
-  static const String areaCreate = '/area/create';
-  static const String areaUpdate = '/area/update';
-  static const String areaDelete = '/area/delete';
+  // Area routes live under `/areas/*` and reply with bare JSON
+  // (`[{id,name}]` for list, `{id}` for create) instead of the
+  // `{success,message,data}` envelope. Detail/update/delete are not
+  // deployed yet (404).
+  static const String areaList = '/areas/list';
+  static const String areaCreate = '/areas/create';
 
   static const String sensorList = '/sensor/list';
   static const String sensorDetail = '/sensor/detail';

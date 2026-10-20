@@ -9,11 +9,15 @@ class SensorCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
+  /// Readable area name. Falls back to `Area <id>` when null.
+  final String? areaName;
+
   const SensorCard({
     super.key,
     required this.sensor,
     this.onEdit,
     this.onDelete,
+    this.areaName,
   });
 
   @override
@@ -67,7 +71,7 @@ class SensorCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    "Area ${sensor.areaId}",
+                    areaName ?? "Area ${sensor.areaId}",
                     style: const TextStyle(
                       color: AppColors.areaAccent,
                       fontSize: 11,

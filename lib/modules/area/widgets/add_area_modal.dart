@@ -27,31 +27,35 @@ class _AddAreaModalState extends State<AddAreaModal> {
   }
 
   void _submit() async {
-    if (_formKey.currentState!.validate()) {
-      final provider = context.read<AreaProvider>();
-      
-      final success = await provider.createArea(
-        name: _nameController.text.trim(),
-        location: _locationController.text.trim().isNotEmpty ? _locationController.text.trim() : null,
-        description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
-      );
+    if (!_formKey.currentState!.validate()) return;
 
-      if (success && mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Berhasil menambahkan area"),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(provider.errorMessage ?? "Gagal menambahkan area"),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+    final provider = context.read<AreaProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final location = _locationController.text.trim();
+    final description = _descriptionController.text.trim();
+
+    final success = await provider.createArea(
+      name: _nameController.text.trim(),
+      location: location.isNotEmpty ? location : null,
+      description: description.isNotEmpty ? description : null,
+    );
+
+    if (success) {
+      navigator.pop(true);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Berhasil menambahkan area"),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? "Gagal menambahkan area"),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 

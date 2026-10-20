@@ -41,6 +41,26 @@ class RpcClient {
     Map<String, dynamic>? params,
     Map<String, String>? extraHeaders,
   }) async {
+    final decoded = await callRaw(
+      procedure: procedure,
+      params: params,
+      extraHeaders: extraHeaders,
+    );
+
+    if (decoded is Map<String, dynamic>) return decoded;
+
+    // Endpoint answered with a bare array/scalar; wrap it in the envelope.
+    return {'success': true, 'message': '', 'data': decoded};
+  }
+
+  /// Same as [call] but returns the decoded body as-is. Needed for endpoints
+  /// that reply with a bare JSON array or a plain object instead of the
+  /// `{success, message, data}` envelope (e.g. `/areas/list`, `/areas/create`).
+  Future<dynamic> callRaw({
+    required String procedure,
+    Map<String, dynamic>? params,
+    Map<String, String>? extraHeaders,
+  }) async {
     final bearer = token ?? (getToken != null ? await getToken!() : null);
 
     final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
@@ -61,16 +81,20 @@ class RpcClient {
         body: jsonEncode(params ?? {}),
       );
 
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final body = response.body.trim();
+      final decoded = body.isEmpty ? null : jsonDecode(body);
+      final asMap = decoded is Map<String, dynamic> ? decoded : null;
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return decoded;
       } else {
         throw RpcException(
           statusCode: response.statusCode,
-          message: decoded['message'] as String? ?? 'Terjadi kesalahan pada server.',
-          errors: decoded['errors'] != null
-              ? List<String>.from(decoded['errors'] as List)
+          message: asMap?['message'] as String? ??
+              asMap?['error'] as String? ??
+              'Terjadi kesalahan pada server.',
+          errors: asMap?['errors'] is List
+              ? List<String>.from(asMap!['errors'] as List)
               : const [],
         );
       }

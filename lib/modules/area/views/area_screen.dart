@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../../utils/colorScheme.dart';
 import '../../../widgets/app_button.dart';
 import '../providers/area_provider.dart';
-import '../models/area_model.dart';
 import '../models/sensor_model.dart';
 import '../widgets/area_card.dart';
 import '../widgets/sensor_card.dart';
@@ -25,12 +24,64 @@ class _AreaScreenState extends State<AreaScreen> {
   @override
   void initState() {
     super.initState();
-    // call fetchAreas and fetchSensors for a real app scenario later
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   final provider = context.read<AreaProvider>();
-    //   provider.fetchAreas();
-    //   provider.fetchSensors();
-    // });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AreaProvider>().loadAll();
+    });
+  }
+
+  Future<void> _refresh() => context.read<AreaProvider>().loadAll();
+
+  Future<void> _openModal(Widget modal) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => modal,
+    );
+    if (saved == true && mounted) {
+      await _refresh();
+    }
+  }
+
+  Future<void> _confirmDelete(SensorModel sensor) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Hapus Sensor"),
+        content: Text(
+          "Hapus sensor \"${sensor.name.isNotEmpty ? sensor.name : sensor.code}\"? "
+          "Tindakan ini tidak dapat dibatalkan.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text("Batal"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              "Hapus",
+              style: TextStyle(color: AppColors.actionDelete),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final provider = context.read<AreaProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final success = await provider.deleteSensor(sensor.id);
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? "Sensor berhasil dihapus"
+              : provider.errorMessage ?? "Gagal menghapus sensor",
+        ),
+        backgroundColor: success ? AppColors.success : AppColors.error,
+      ),
+    );
   }
 
   @override
@@ -87,7 +138,7 @@ class _AreaScreenState extends State<AreaScreen> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<int>(
-                        value: null, // Change to a state variable later if filtering is implemented
+                        value: areaProvider.sensorAreaFilter ?? 0,
                         hint: const Text(
                           "Area",
                           style: TextStyle(
@@ -111,7 +162,10 @@ class _AreaScreenState extends State<AreaScreen> {
                           ),
                         ],
                         onChanged: (value) {
-                          // TODO: Apply filter when pressed
+                          // 0 is the "Semua Area" sentinel -> no server filter.
+                          areaProvider.fetchSensors(
+                            areaId: (value == null || value == 0) ? null : value,
+                          );
                         },
                       ),
                     ),
@@ -120,26 +174,17 @@ class _AreaScreenState extends State<AreaScreen> {
             ),
           ),
           // List of Areas or Sensors
-          Expanded(
-            child: _selectedChipIndex == 0
-                ? _buildAreaList(areaProvider.areas)
-                : _buildSensorList(areaProvider.sensors),
-          ),
+          Expanded(child: _buildBody(areaProvider)),
           // Tambah Button
           Padding(
             padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 20.0),
             child: AppButton(
               text: _selectedChipIndex == 0 ? "Tambah Area" : "Tambah Sensor",
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return _selectedChipIndex == 0
-                        ? const AddAreaModal()
-                        : const AddSensorModal();
-                  },
-                );
-              },
+              onPressed: () => _openModal(
+                _selectedChipIndex == 0
+                    ? const AddAreaModal()
+                    : AddSensorModal(initialAreaId: areaProvider.sensorAreaFilter),
+              ),
               backgroundColor: AppColors.areaAccent,
               textColor: Colors.white,
               borderRadius: 24.0,
@@ -151,36 +196,88 @@ class _AreaScreenState extends State<AreaScreen> {
     );
   }
 
-  Widget _buildAreaList(List<AreaModel> areas) {
-    if (areas.isEmpty) {
-      return const Center(
-        child: Text(
-          "Belum ada data area.",
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
+  Widget _buildBody(AreaProvider provider) {
+    final isAreaTab = _selectedChipIndex == 0;
+    final items = isAreaTab ? provider.areas : provider.sensors;
+
+    if (provider.isLoading && items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (provider.errorMessage != null && items.isEmpty) {
+      return _buildMessage(provider.errorMessage!, showRetry: true);
+    }
+
+    if (items.isEmpty) {
+      return _buildMessage(
+        isAreaTab ? "Belum ada data area." : "Belum ada data sensor.",
       );
     }
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      color: AppColors.areaAccent,
+      child: isAreaTab
+          ? _buildAreaList(provider)
+          : _buildSensorList(provider),
+    );
+  }
+
+  Widget _buildMessage(String text, {bool showRetry = false}) {
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      color: AppColors.areaAccent,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
+        children: [
+          Text(
+            text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          if (showRetry) ...[
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton(
+                onPressed: _refresh,
+                child: const Text(
+                  "Coba lagi",
+                  style: TextStyle(color: AppColors.areaAccent),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAreaList(AreaProvider provider) {
+    final areas = provider.areas;
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       itemCount: areas.length,
       itemBuilder: (context, index) {
+        final area = areas[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
-          child: AreaCard(area: areas[index]),
+          child: AreaCard(
+            area: area,
+            sensorsCount: provider.sensorAreaFilter == null
+                ? provider.sensorCountOf(area.id)
+                : null,
+            onDetailTap: () {
+              setState(() => _selectedChipIndex = 1);
+              provider.fetchSensors(areaId: area.id);
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildSensorList(List<SensorModel> sensors) {
-    if (sensors.isEmpty) {
-      return const Center(
-        child: Text(
-          "Belum ada data sensor.",
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-      );
-    }
+  Widget _buildSensorList(AreaProvider provider) {
+    final sensors = provider.sensors;
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -191,7 +288,13 @@ class _AreaScreenState extends State<AreaScreen> {
       ),
       itemCount: sensors.length,
       itemBuilder: (context, index) {
-        return SensorCard(sensor: sensors[index]);
+        final sensor = sensors[index];
+        return SensorCard(
+          sensor: sensor,
+          areaName: provider.areaNameOf(sensor.areaId),
+          onEdit: () => _openModal(AddSensorModal(sensor: sensor)),
+          onDelete: () => _confirmDelete(sensor),
+        );
       },
     );
   }

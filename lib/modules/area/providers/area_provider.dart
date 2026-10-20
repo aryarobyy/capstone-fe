@@ -20,12 +20,14 @@ class AreaProvider extends ChangeNotifier {
   String? _errorMessage;
 
   List<AreaModel> _areas = [];
-  AreaModel? _selectedArea;
   int _totalAreas = 0;
 
   List<SensorModel> _sensors = [];
   SensorModel? _selectedSensor;
   int _totalSensors = 0;
+
+  /// `null` means "Semua Area" (no server-side filter).
+  int? _sensorAreaFilter;
 
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
@@ -33,39 +35,51 @@ class AreaProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   List<AreaModel> get areas => _areas;
-  AreaModel? get selectedArea => _selectedArea;
   int get totalAreas => _totalAreas;
 
   List<SensorModel> get sensors => _sensors;
   SensorModel? get selectedSensor => _selectedSensor;
   int get totalSensors => _totalSensors;
+  int? get sensorAreaFilter => _sensorAreaFilter;
 
-  void selectArea(AreaModel? area) {
-    _selectedArea = area;
-    notifyListeners();
-    if (area != null) {
-      fetchSensors(areaId: area.id);
-    }
+  /// Readable area name by id, for the tag on sensor cards.
+  String areaNameOf(int areaId) {
+    final area = _areas.firstWhere(
+      (a) => a.id == areaId,
+      orElse: () => AreaModel(id: areaId, name: ''),
+    );
+    return area.name.isNotEmpty ? area.name : 'Area $areaId';
   }
+
+  /// Sensors loaded for an area. Only complete while no area filter is active,
+  /// since the backend paginates sensors per area.
+  int sensorCountOf(int areaId) =>
+      _sensors.where((s) => s.areaId == areaId).length;
 
   void selectSensor(SensorModel? sensor) {
     _selectedSensor = sensor;
     notifyListeners();
   }
 
-  Future<void> fetchAreas({int limit = 20, int index = 0}) async {
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Loads areas and sensors together, the state the area screen needs.
+  Future<void> loadAll() async {
+    await fetchAreas();
+    await fetchSensors(areaId: _sensorAreaFilter);
+  }
+
+  Future<void> fetchAreas() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final response = await areaService.getAreaList(limit: limit, index: index);
-      if (response.success && response.data != null) {
-        _areas = response.data!.data;
-        _totalAreas = response.data!.total;
-      } else {
-        _errorMessage = response.message;
-      }
+      _areas = await areaService.getAreaList();
+      _totalAreas = _areas.length;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
     } catch (e) {
@@ -73,37 +87,6 @@ class AreaProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
-    }
-  }
-
-  Future<bool> fetchAreaDetail(int id) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await areaService.getAreaDetail(id);
-      if (response.success && response.data != null) {
-        _selectedArea = response.data;
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = response.message;
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-    } on RpcException catch (e) {
-      _errorMessage = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Gagal memuat detail lahan: $e';
-      _isLoading = false;
-      notifyListeners();
-      return false;
     }
   }
 
@@ -117,121 +100,38 @@ class AreaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await areaService.createArea(
+      final id = await areaService.createArea(
         name: name,
         description: description,
         location: location,
       );
 
-      if (response.success && response.data != null) {
-        _areas.insert(0, response.data!);
-        _totalAreas++;
-        _isSaving = false;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = response.message;
-        _isSaving = false;
-        notifyListeners();
-        return false;
-      }
+      // Create only returns the id, so insert locally with what we sent.
+      _areas.insert(
+        0,
+        AreaModel(
+          id: id,
+          name: name,
+          description: description,
+          location: location,
+        ),
+      );
+      _totalAreas++;
+      return true;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
-      _isSaving = false;
-      notifyListeners();
       return false;
     } catch (e) {
       _errorMessage = 'Gagal menambahkan lahan: $e';
+      return false;
+    } finally {
       _isSaving = false;
       notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> updateArea({
-    required int id,
-    required String name,
-    String? description,
-    String? location,
-  }) async {
-    _isSaving = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await areaService.updateArea(
-        id: id,
-        name: name,
-        description: description,
-        location: location,
-      );
-
-      if (response.success && response.data != null) {
-        final idx = _areas.indexWhere((a) => a.id == id);
-        if (idx >= 0) {
-          _areas[idx] = response.data!;
-        }
-        if (_selectedArea?.id == id) {
-          _selectedArea = response.data;
-        }
-        _isSaving = false;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = response.message;
-        _isSaving = false;
-        notifyListeners();
-        return false;
-      }
-    } on RpcException catch (e) {
-      _errorMessage = e.toString();
-      _isSaving = false;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Gagal memperbarui lahan: $e';
-      _isSaving = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> deleteArea(int id) async {
-    _isDeleting = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      final response = await areaService.deleteArea(id);
-      if (response.success) {
-        _areas.removeWhere((a) => a.id == id);
-        _totalAreas = (_totalAreas - 1).clamp(0, double.infinity).toInt();
-        if (_selectedArea?.id == id) {
-          _selectedArea = null;
-        }
-        _isDeleting = false;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = response.message;
-        _isDeleting = false;
-        notifyListeners();
-        return false;
-      }
-    } on RpcException catch (e) {
-      _errorMessage = e.toString();
-      _isDeleting = false;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Gagal menghapus lahan: $e';
-      _isDeleting = false;
-      notifyListeners();
-      return false;
     }
   }
 
   Future<void> fetchSensors({int? areaId, int limit = 20, int index = 0}) async {
+    _sensorAreaFilter = areaId;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -247,7 +147,7 @@ class AreaProvider extends ChangeNotifier {
         _sensors = response.data!.data;
         _totalSensors = response.data!.total;
       } else {
-        _errorMessage = response.message;
+        _errorMessage = _messageOf(response.message, response.errors);
       }
     } on RpcException catch (e) {
       _errorMessage = e.toString();
@@ -278,27 +178,24 @@ class AreaProvider extends ChangeNotifier {
       );
 
       if (response.success && response.data != null) {
-        _sensors.insert(0, response.data!);
-        _totalSensors++;
-        _isSaving = false;
-        notifyListeners();
+        // Respect the active filter: a new sensor outside it stays hidden.
+        if (_sensorAreaFilter == null || _sensorAreaFilter == areaId) {
+          _sensors.insert(0, response.data!);
+          _totalSensors++;
+        }
         return true;
-      } else {
-        _errorMessage = response.message;
-        _isSaving = false;
-        notifyListeners();
-        return false;
       }
+      _errorMessage = _messageOf(response.message, response.errors);
+      return false;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
-      _isSaving = false;
-      notifyListeners();
       return false;
     } catch (e) {
       _errorMessage = 'Gagal mendaftarkan sensor: $e';
+      return false;
+    } finally {
       _isSaving = false;
       notifyListeners();
-      return false;
     }
   }
 
@@ -330,25 +227,23 @@ class AreaProvider extends ChangeNotifier {
         if (_selectedSensor?.id == id) {
           _selectedSensor = response.data;
         }
-        _isSaving = false;
-        notifyListeners();
+        // Moved out of the active filter -> drop it from the visible list.
+        if (_sensorAreaFilter != null && _sensorAreaFilter != areaId) {
+          _sensors.removeWhere((s) => s.id == id);
+        }
         return true;
-      } else {
-        _errorMessage = response.message;
-        _isSaving = false;
-        notifyListeners();
-        return false;
       }
+      _errorMessage = _messageOf(response.message, response.errors);
+      return false;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
-      _isSaving = false;
-      notifyListeners();
       return false;
     } catch (e) {
       _errorMessage = 'Gagal memperbarui sensor: $e';
+      return false;
+    } finally {
       _isSaving = false;
       notifyListeners();
-      return false;
     }
   }
 
@@ -361,29 +256,26 @@ class AreaProvider extends ChangeNotifier {
       final response = await sensorService.deleteSensor(id);
       if (response.success) {
         _sensors.removeWhere((s) => s.id == id);
-        _totalSensors = (_totalSensors - 1).clamp(0, double.infinity).toInt();
+        _totalSensors = (_totalSensors - 1).clamp(0, _totalSensors);
         if (_selectedSensor?.id == id) {
           _selectedSensor = null;
         }
-        _isDeleting = false;
-        notifyListeners();
         return true;
-      } else {
-        _errorMessage = response.message;
-        _isDeleting = false;
-        notifyListeners();
-        return false;
       }
+      _errorMessage = _messageOf(response.message, response.errors);
+      return false;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
-      _isDeleting = false;
-      notifyListeners();
       return false;
     } catch (e) {
       _errorMessage = 'Gagal menghapus sensor: $e';
+      return false;
+    } finally {
       _isDeleting = false;
       notifyListeners();
-      return false;
     }
   }
+
+  String _messageOf(String message, List<String> errors) =>
+      errors.isEmpty ? message : '$message ${errors.join(", ")}';
 }

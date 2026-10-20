@@ -5,11 +5,15 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/app_text_field.dart';
 import '../providers/area_provider.dart';
 import '../models/area_model.dart';
+import '../models/sensor_model.dart';
 
 class AddSensorModal extends StatefulWidget {
   final int? initialAreaId;
 
-  const AddSensorModal({super.key, this.initialAreaId});
+  /// When provided the modal edits that sensor instead of creating a new one.
+  final SensorModel? sensor;
+
+  const AddSensorModal({super.key, this.initialAreaId, this.sensor});
 
   @override
   State<AddSensorModal> createState() => _AddSensorModalState();
@@ -23,11 +27,19 @@ class _AddSensorModalState extends State<AddSensorModal> {
   
   int? _selectedAreaId;
 
+  bool get _isEdit => widget.sensor != null;
+
   @override
   void initState() {
     super.initState();
-    _selectedAreaId = widget.initialAreaId;
-    
+    final sensor = widget.sensor;
+    _selectedAreaId = sensor?.areaId ?? widget.initialAreaId;
+    if (sensor != null) {
+      _nameController.text = sensor.name;
+      _codeController.text = sensor.code;
+      _descriptionController.text = sensor.description ?? '';
+    }
+
     // If no initial area is selected, try to select the first one if available
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_selectedAreaId == null) {
@@ -50,42 +62,59 @@ class _AddSensorModalState extends State<AddSensorModal> {
   }
 
   void _submit() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedAreaId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Silakan pilih area terlebih dahulu"),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
+    if (!_formKey.currentState!.validate()) return;
 
-      final provider = context.read<AreaProvider>();
-      
-      final success = await provider.createSensor(
-        name: _nameController.text.trim(),
-        code: _codeController.text.trim(),
-        areaId: _selectedAreaId!,
-        description: _descriptionController.text.trim().isNotEmpty ? _descriptionController.text.trim() : null,
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (_selectedAreaId == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Silakan pilih area terlebih dahulu"),
+          backgroundColor: AppColors.error,
+        ),
       );
+      return;
+    }
 
-      if (success && mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Berhasil menambahkan sensor"),
-            backgroundColor: AppColors.success,
+    final provider = context.read<AreaProvider>();
+    final navigator = Navigator.of(context);
+    final description = _descriptionController.text.trim();
+
+    final success = _isEdit
+        ? await provider.updateSensor(
+            id: widget.sensor!.id,
+            name: _nameController.text.trim(),
+            code: _codeController.text.trim(),
+            areaId: _selectedAreaId!,
+            description: description.isNotEmpty ? description : null,
+          )
+        : await provider.createSensor(
+            name: _nameController.text.trim(),
+            code: _codeController.text.trim(),
+            areaId: _selectedAreaId!,
+            description: description.isNotEmpty ? description : null,
+          );
+
+    if (success) {
+      navigator.pop(true);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            _isEdit ? "Berhasil memperbarui sensor" : "Berhasil menambahkan sensor",
           ),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(provider.errorMessage ?? "Gagal menambahkan sensor"),
-            backgroundColor: AppColors.error,
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage ??
+                (_isEdit ? "Gagal memperbarui sensor" : "Gagal menambahkan sensor"),
           ),
-        );
-      }
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -111,9 +140,9 @@ class _AddSensorModalState extends State<AddSensorModal> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      "Tambah Sensor",
-                      style: TextStyle(
+                    Text(
+                      _isEdit ? "Edit Sensor" : "Tambah Sensor",
+                      style: const TextStyle(
                         color: AppColors.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
