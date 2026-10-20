@@ -1,35 +1,21 @@
+import '../../riwayat/models/history_item_model.dart';
+
+/// Dashboard numbers, composed client-side from the area, sensor and history
+/// list endpoints (the server has no `/dashboard/summary`).
 class HomeDashboardModel {
-  final String? welcomeMessage;
   final int totalAreas;
   final int totalSensors;
   final int totalAnomaliesToday;
-  final Map<String, dynamic>? extraData;
+
+  /// Anomalies not yet back to `NORMAL` (FATAL + CRITICAL + WARNING).
+  final int activeAnomalies;
+  final List<HistoryItemModel> recentEvents;
 
   const HomeDashboardModel({
-    this.welcomeMessage,
     this.totalAreas = 0,
     this.totalSensors = 0,
     this.totalAnomaliesToday = 0,
-    this.extraData,
+    this.activeAnomalies = 0,
+    this.recentEvents = const [],
   });
-
-  factory HomeDashboardModel.fromJson(Map<String, dynamic> json) {
-    return HomeDashboardModel(
-      welcomeMessage: json['welcome_message'] as String?,
-      totalAreas: json['total_areas'] as int? ?? 0,
-      totalSensors: json['total_sensors'] as int? ?? 0,
-      totalAnomaliesToday: json['total_anomalies_today'] as int? ?? 0,
-      extraData: json['extra_data'] as Map<String, dynamic>?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      if (welcomeMessage != null) 'welcome_message': welcomeMessage,
-      'total_areas': totalAreas,
-      'total_sensors': totalSensors,
-      'total_anomalies_today': totalAnomaliesToday,
-      if (extraData != null) 'extra_data': extraData,
-    };
-  }
 }

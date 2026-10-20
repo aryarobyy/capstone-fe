@@ -196,21 +196,6 @@ class _LoginViewState extends State<LoginView> {
                               );
                             },
                           ),
-                          const SizedBox(height: 16.0),
-                          Center(
-                            child: TextButton.icon(
-                              onPressed: () {
-                                authProvider.devBypassLogin();
-                                Navigator.pushReplacementNamed(context, '/main');
-                              },
-                              icon: const Icon(Icons.developer_mode, size: 16),
-                              label: const Text('Bypass Login (Dev Mode)'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.textHint,
-                                textStyle: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     ),

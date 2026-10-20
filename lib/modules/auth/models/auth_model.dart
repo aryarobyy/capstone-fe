@@ -67,15 +67,25 @@ class LoginRequest {
   final String email;
   final String password;
 
+  /// FCM registration. The backend requires both or neither.
+  final String? deviceToken;
+  final String? deviceType;
+
   const LoginRequest({
     required this.email,
     required this.password,
+    this.deviceToken,
+    this.deviceType,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'email': email,
       'password': password,
+      if (deviceToken != null && deviceType != null) ...{
+        'device_token': deviceToken,
+        'device_type': deviceType,
+      },
     };
   }
 }

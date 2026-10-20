@@ -1,6 +1,8 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import '../core/network/rpc_client.dart';
+import '../core/notifications/push_service.dart';
 import '../modules/area/providers/area_provider.dart';
 import '../modules/area/services/area_service.dart';
 import '../modules/area/services/sensor_service.dart';
@@ -30,6 +32,7 @@ class AppProviders {
     String baseUrl = defaultBaseUrl,
     Future<String?> Function()? getToken,
     RpcClient? client,
+    FlutterSecureStorage storage = const FlutterSecureStorage(),
   }) {
     final rpcClient = client ??
         RpcClient(
@@ -62,6 +65,8 @@ class AppProviders {
         create: (_) => AuthProvider(
           authService: authService,
           rpcClient: rpcClient,
+          deviceRegistration: fetchDeviceRegistration,
+          storage: storage,
         ),
       ),
       ChangeNotifierProvider<HomeProvider>(
