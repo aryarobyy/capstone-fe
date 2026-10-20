@@ -126,7 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         _buildMetricCard(
           icon: Icons.warning_amber_rounded,
-          label: "Tanaman Sakit",
+          label: "Area Sakit",
           value: "0", // Currently not provided by HomeDashboardModel
         ),
       ],
