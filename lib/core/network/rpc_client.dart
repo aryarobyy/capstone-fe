@@ -36,6 +36,9 @@ class RpcClient {
   /// cleared on logout. Takes precedence over [getToken].
   String? token;
 
+  /// Refreshes the session on 401; returns the new access token or null.
+  Future<String?> Function()? onUnauthorized;
+
   Future<Map<String, dynamic>> call({
     required String procedure,
     Map<String, dynamic>? params,
@@ -60,6 +63,14 @@ class RpcClient {
     required String procedure,
     Map<String, dynamic>? params,
     Map<String, String>? extraHeaders,
+  }) =>
+      _send(procedure, params, extraHeaders, canRetry: true);
+
+  Future<dynamic> _send(
+    String procedure,
+    Map<String, dynamic>? params,
+    Map<String, String>? extraHeaders, {
+    required bool canRetry,
   }) async {
     final bearer = token ?? (getToken != null ? await getToken!() : null);
 
@@ -96,6 +107,20 @@ class RpcClient {
         if (decoded is Map<String, dynamic>) asMap = decoded;
       } on FormatException {
         asMap = null;
+      }
+
+      if (response.statusCode == 401 &&
+          canRetry &&
+          onUnauthorized != null &&
+          bearer != null &&
+          bearer.isNotEmpty &&
+          !procedure.startsWith('/auth/')) {
+        final fresh = (token != null && token != bearer)
+            ? token
+            : await onUnauthorized!();
+        if (fresh != null) {
+          return await _send(procedure, params, extraHeaders, canRetry: false);
+        }
       }
 
       throw RpcException(

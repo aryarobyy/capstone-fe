@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../utils/colorScheme.dart';
 import '../providers/history_provider.dart';
 import '../models/history_item_model.dart';
+import '../widgets/status_badge.dart';
 
 class RiwayatScreen extends StatefulWidget {
   static const routeName = '/riwayat';
@@ -17,18 +18,20 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
   @override
   void initState() {
     super.initState();
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   context.read<HistoryProvider>().fetchHistories(refresh: true);
-    // });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<HistoryProvider>().fetchHistories(refresh: true);
+    });
   }
 
   String _formatDateYMD(DateTime date) {
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
 
-  Future<void> _selectDateRange(BuildContext context, HistoryProvider provider) async {
-    final DateTimeRange? picked = await showDateRangePicker(
+  // Backend filters one calendar day (`started_at::date = date`), not a range.
+  Future<void> _selectDate(BuildContext context, HistoryProvider provider) async {
+    final DateTime? picked = await showDatePicker(
       context: context,
+      initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       builder: (context, child) {
@@ -45,11 +48,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
       },
     );
 
-    if (picked != null) {
-      final start = _formatDateYMD(picked.start);
-      final end = _formatDateYMD(picked.end);
-      provider.updateFilter(date: '$start|$end');
-    }
+    if (picked != null) provider.setDate(_formatDateYMD(picked));
   }
 
   void _showStatusFilter(BuildContext context, HistoryProvider provider) {
@@ -74,27 +73,20 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              ListTile(
-                title: const Text("Semua Status"),
-                onTap: () {
-                  provider.updateFilter(status: null);
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text("Bahaya"),
-                onTap: () {
-                  provider.updateFilter(status: "Bahaya");
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text("Waspada"),
-                onTap: () {
-                  provider.updateFilter(status: "Waspada");
-                  Navigator.pop(context);
-                },
-              ),
+              for (final (label, value) in const [
+                ("Semua Status", null),
+                ("Fatal", "FATAL"),
+                ("Kritis", "CRITICAL"),
+                ("Waspada", "WARNING"),
+                ("Normal", "NORMAL"),
+              ])
+                ListTile(
+                  title: Text(label),
+                  onTap: () {
+                    provider.setStatus(value);
+                    Navigator.pop(context);
+                  },
+                ),
             ],
           ),
         );
@@ -142,8 +134,16 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                 _buildFilterButton(
                   icon: Icons.calendar_today_outlined,
                   label: "Date",
-                  onTap: () => _selectDateRange(context, provider),
+                  onTap: () => _selectDate(context, provider),
                 ),
+                if (provider.filterParams.date != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6.0),
+                    child: InputChip(
+                      label: Text(provider.filterParams.date!),
+                      onDeleted: () => provider.setDate(null),
+                    ),
+                  ),
                 const SizedBox(width: 10),
                 _buildFilterButton(
                   icon: Icons.filter_alt_outlined,
@@ -156,23 +156,46 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
           
           // List View
           Expanded(
-            child: histories.isEmpty
-                ? const Center(
-                    child: Text(
-                      "Belum ada riwayat kejadian.",
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    itemCount: histories.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: _buildHistoryCard(histories[index]),
-                      );
-                    },
-                  ),
+            child: provider.isLoading && histories.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : histories.isEmpty
+                    ? Center(
+                        child: Text(
+                          provider.errorMessage ?? "Belum ada riwayat kejadian.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: provider.errorMessage != null
+                                ? AppColors.error
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () => provider.fetchHistories(refresh: true),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          itemCount: histories.length + (provider.hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == histories.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: Center(
+                                  child: provider.isLoadingMore
+                                      ? const CircularProgressIndicator()
+                                      : TextButton(
+                                          onPressed: provider.loadMore,
+                                          child: const Text("Muat lebih banyak"),
+                                        ),
+                                ),
+                              );
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: _buildHistoryCard(histories[index]),
+                            );
+                          },
+                        ),
+                      ),
           ),
         ],
       ),
@@ -215,17 +238,10 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
   }
 
   Widget _buildHistoryCard(HistoryItemModel item) {
-    // Determine status badge color
-    Color badgeColor = AppColors.badgeDanger;
-    if (item.status.toLowerCase() == "waspada") {
-      badgeColor = AppColors.badgeWarning;
-    } else if (item.status.toLowerCase() == "aman") {
-      badgeColor = AppColors.success;
-    }
-
     String dateStr = "N/A";
-    if (item.createdAt != null) {
-      final date = item.createdAt!;
+    final started = item.startedAt?.toLocal();
+    if (started != null) {
+      final date = started;
       const months = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
       dateStr = "${date.day} ${months[date.month]} ${date.year}";
     }
@@ -255,7 +271,8 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
             child: Column(
               children: [
-                _buildCardRow("Area", "${item.sensorId}"),
+                // History only carries sensor_id; the area is not in the payload.
+                _buildCardRow("ID Sensor", "${item.sensorId}"),
                 const SizedBox(height: 6),
                 _buildCardRow("Sensor", item.parameter.isNotEmpty ? item.parameter : "-"),
                 const SizedBox(height: 6),
@@ -271,21 +288,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                         height: 1.4,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: badgeColor,
-                        borderRadius: BorderRadius.circular(6.0),
-                      ),
-                      child: Text(
-                        item.status,
-                        style: TextStyle(
-                          color: item.status.toLowerCase() == "waspada" ? AppColors.textPrimary : Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    StatusBadge(item.status),
                   ],
                 ),
               ],

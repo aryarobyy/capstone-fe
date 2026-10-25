@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/rpc_client.dart';
 import '../models/home_dashboard_model.dart';
 import '../services/home_service.dart';
 
@@ -21,12 +22,9 @@ class HomeProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await homeService.getDashboardSummary();
-      if (response.success && response.data != null) {
-        _dashboardData = response.data!;
-      } else {
-        _errorMessage = response.message;
-      }
+      _dashboardData = await homeService.getDashboardSummary();
+    } on RpcException catch (e) {
+      _errorMessage = e.toString();
     } catch (e) {
       _errorMessage = 'Gagal memuat ringkasan dashboard: $e';
     } finally {

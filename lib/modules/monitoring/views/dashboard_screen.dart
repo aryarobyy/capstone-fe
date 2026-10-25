@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/colorScheme.dart';
 import '../../home/providers/home_provider.dart';
+import '../../riwayat/widgets/status_badge.dart';
 
 class DashboardScreen extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -16,18 +17,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // In a real app we might call this. For now we use the mock UI.
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   context.read<HomeProvider>().fetchDashboardSummary();
-    // });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<HomeProvider>().fetchDashboardSummary();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final homeProvider = context.watch<HomeProvider>();
-
-    // For now we will use static UI to match the guide exactly
-    // but structure it so the data can be swapped easily.
 
     return Scaffold(
       backgroundColor: AppColors.backgroundCanvas, // #FFFFFF
@@ -54,11 +51,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         centerTitle: false,
         titleSpacing: 0,
       ),
-      body: SingleChildScrollView(
+      body: RefreshIndicator(
+        onRefresh: homeProvider.fetchDashboardSummary,
+        child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (homeProvider.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12.0),
+                child: LinearProgressIndicator(),
+              ),
+            if (homeProvider.errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Text(
+                  homeProvider.errorMessage!,
+                  style: const TextStyle(color: AppColors.error),
+                ),
+              ),
             // Section 1: Ringkasan Kebun
             const Text(
               "Ringkasan Kebun",
@@ -89,18 +102,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
   Widget _buildMetricGrid(HomeProvider provider) {
-    // Determine data to show (0 if no data)
     final totalArea = provider.dashboardData.totalAreas;
     final kejadianHariIni = provider.dashboardData.totalAnomaliesToday;
     final totalSensor = provider.dashboardData.totalSensors;
-    // Mocking sehat/sakit split based on total sensors just for UI completeness, 
-    // or we can just use 0 since user said "do not show dummy data".
-    // I'll put 0 if no data.
-    
+
     return GridView.count(
       crossAxisCount: 2,
       childAspectRatio: 1.3,
@@ -126,8 +136,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         _buildMetricCard(
           icon: Icons.warning_amber_rounded,
-          label: "Area Sakit",
-          value: "0", // Currently not provided by HomeDashboardModel
+          label: "Anomali Aktif",
+          value: "${provider.dashboardData.activeAnomalies}",
         ),
       ],
     );
@@ -176,9 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildRecentEventsTable(HomeProvider provider) {
-    // Currently HomeDashboardModel doesn't provide a list of recent events.
-    // To respect the rule of "no dummy data", if there are no events, we show an empty state message.
-    final hasEvents = false; // Replace with provider.dashboardData.recentEvents.isNotEmpty later
+    final events = provider.dashboardData.recentEvents;
 
     return Column(
       children: [
@@ -186,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Row(
           children: [
             Expanded(flex: 1, child: _buildTableHeaderText("No")),
-            Expanded(flex: 1, child: _buildTableHeaderText("Area")),
+            Expanded(flex: 1, child: _buildTableHeaderText("ID")),
             Expanded(flex: 4, child: _buildTableHeaderText("Sensor")),
             Expanded(flex: 2, child: _buildTableHeaderText("Status", alignRight: true)),
           ],
@@ -195,8 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Divider(color: AppColors.border, height: 1, thickness: 1),
         const SizedBox(height: 12),
         
-        // Empty State or Real Data
-        if (!hasEvents)
+        if (events.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24.0),
             child: Text(
@@ -205,8 +212,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           )
         else
-          // When API is ready, loop through events here
-          const SizedBox.shrink(),
+          for (var i = 0; i < events.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildTableRow(
+                no: "${i + 1}",
+                // History only carries sensor_id; the area is not in the payload.
+                sensorId: "${events[i].sensorId}",
+                sensor: events[i].parameter.isNotEmpty ? events[i].parameter : "-",
+                status: events[i].status,
+              ),
+            ),
       ],
     );
   }
@@ -225,22 +241,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildTableRow({
     required String no,
-    required String area,
+    required String sensorId,
     required String sensor,
-    required String statusText,
-    required Color statusColor,
-    required Color statusTextColor,
+    required String status,
   }) {
     return Row(
       children: [
         Expanded(flex: 1, child: _buildTableRowText(no)),
-        Expanded(flex: 1, child: _buildTableRowText(area)),
+        Expanded(flex: 1, child: _buildTableRowText(sensorId)),
         Expanded(flex: 4, child: _buildTableRowText(sensor)),
         Expanded(
           flex: 2,
           child: Align(
             alignment: Alignment.centerRight,
-            child: _buildStatusBadge(statusText, statusColor, statusTextColor),
+            child: StatusBadge(status),
           ),
         ),
       ],
@@ -258,21 +272,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String text, Color bgColor, Color textColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(6.0),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: textColor,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
 }

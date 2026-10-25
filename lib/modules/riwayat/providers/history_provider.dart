@@ -35,20 +35,22 @@ class HistoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateFilter({
-    int? sensorId,
-    String? parameter,
-    String? status,
-    String? date,
-  }) {
-    _filterParams = _filterParams.copyWith(
-      sensorId: sensorId,
-      parameter: parameter,
+  /// [status] is the backend enum (`FATAL|CRITICAL|WARNING|NORMAL`); null clears it.
+  void setStatus(String? status) => _refilter(status: status, date: _filterParams.date);
+
+  /// [date] is a single `YYYY-MM-DD` day; null clears it.
+  void setDate(String? date) => _refilter(status: _filterParams.status, date: date);
+
+  // copyWith can't clear a field (`??`), so the params are rebuilt here.
+  void _refilter({String? status, String? date}) {
+    final p = _filterParams;
+    _filterParams = HistoryFilterParams(
+      sensorId: p.sensorId,
+      parameter: p.parameter,
       status: status,
       date: date,
-      index: 0,
+      limit: p.limit,
     );
-    notifyListeners();
     fetchHistories(refresh: true);
   }
 
@@ -61,10 +63,11 @@ class HistoryProvider extends ChangeNotifier {
   Future<void> fetchHistories({bool refresh = false}) async {
     if (refresh) {
       _filterParams = _filterParams.copyWith(index: 0);
-      _isLoading = true;
-    } else {
-      _isLoading = true;
+      // Drop stale rows so a failed refetch never shows data for another filter.
+      _histories = [];
+      _total = 0;
     }
+    _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 

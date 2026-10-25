@@ -34,6 +34,25 @@ class AuthService {
     );
   }
 
+  Future<({String accessToken, String refreshToken})> refresh(
+    String refreshToken,
+  ) async {
+    final res = await rpcClient.call(
+      procedure: ApiEndpoints.authRefresh,
+      params: {'refresh_token': refreshToken},
+    );
+    final data = res['data'];
+    final access = data is Map ? data['access_token'] : null;
+    final next = data is Map ? data['refresh_token'] : null;
+    if (access is! String || access.isEmpty || next is! String || next.isEmpty) {
+      throw const RpcException(
+        statusCode: 0,
+        message: 'Respons refresh token tidak valid.',
+      );
+    }
+    return (accessToken: access, refreshToken: next);
+  }
+
   Future<ApiResponse<void>> logout() async {
     final responseMap = await rpcClient.call(
       procedure: ApiEndpoints.authLogout,

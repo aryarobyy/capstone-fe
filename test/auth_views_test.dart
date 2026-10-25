@@ -197,6 +197,7 @@ void main() {
 
       expect(authProvider.isAuthenticated, isTrue);
       expect(authProvider.accessToken, 'mock_token');
+      authProvider.dispose();
     });
   });
 }

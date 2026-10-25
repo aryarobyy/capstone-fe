@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../utils/colorScheme.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../auth/views/login_view.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/profile_header_card.dart';
 import 'edit_profile_view.dart';
@@ -20,7 +22,8 @@ class _ProfileViewState extends State<ProfileView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProfileProvider>().fetchProfile();
+      final userId = context.read<AuthProvider>().currentUser?.id;
+      if (userId != null) context.read<ProfileProvider>().fetchProfile(userId);
     });
   }
 
@@ -117,8 +120,10 @@ class _ProfileViewState extends State<ProfileView> {
                 
                 const SizedBox(height: 32),
                 LogoutButton(
-                  onLogout: () {
-                    // skipped: auth clear state, add when auth logic integrated.
+                  onLogout: () async {
+                    final nav = Navigator.of(context, rootNavigator: true);
+                    await context.read<AuthProvider>().logout();
+                    nav.pushNamedAndRemoveUntil(LoginView.routeName, (_) => false);
                   },
                 ),
                 const SizedBox(height: 24),

@@ -1,9 +1,11 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tanipintar/main.dart';
 import 'package:tanipintar/modules/auth/views/login_view.dart';
 
 void main() {
-  testWidgets('App smoke test initializes and displays LoginView', (WidgetTester tester) async {
+  testWidgets('App smoke test: no saved session lands on LoginView', (WidgetTester tester) async {
+    FlutterSecureStorage.setMockInitialValues({});
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
