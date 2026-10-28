@@ -73,15 +73,14 @@ class MonitoringService {
     );
   }
 
+  /// BE answers 204 with no body, so the saved rule is the one we sent.
   Future<ApiResponse<AlertRuleModel>> saveAlertRule(AlertRuleModel rule) async {
-    final responseMap = await rpcClient.call(
+    await rpcClient.callRaw(
       procedure: ApiEndpoints.alertRuleSave,
-      params: rule.toJson(),
+      // ponytail: fixed 5 min gap (BE requires 1..86400); add to the model
+      // when the UI lets users tune it.
+      params: {...rule.toJson(), 'max_gap_seconds': 300},
     );
-
-    return ApiResponse<AlertRuleModel>.fromJson(
-      responseMap,
-      (data) => AlertRuleModel.fromJson(data as Map<String, dynamic>),
-    );
+    return ApiResponse(success: true, message: '', data: rule);
   }
 }

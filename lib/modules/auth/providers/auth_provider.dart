@@ -14,6 +14,8 @@ class AuthProvider extends ChangeNotifier {
   static const _retryDelay = Duration(seconds: 30);
   static const _kRefresh = 'refresh_token';
   static const _kUser = 'user';
+  // Per-install, not per-user: survives logout on purpose.
+  static const _kInstallation = 'installation_id';
 
   final AuthService authService;
   final RpcClient rpcClient;
@@ -186,16 +188,31 @@ class AuthProvider extends ChangeNotifier {
         device = await deviceRegistration?.call();
       } catch (_) {
       }
+      String? installationId;
+      try {
+        installationId = await storage?.read(key: _kInstallation);
+      } catch (_) {}
       final response = await authService.login(
         LoginRequest(
           email: email,
           password: password,
           deviceToken: device?.token,
           deviceType: device?.type,
+          installationId: installationId,
         ),
       );
 
       if (response.success && response.data != null) {
+        final newInstallation = response.data!.installationId;
+        if (newInstallation != null && newInstallation != installationId) {
+          try {
+            await storage?.write(key: _kInstallation, value: newInstallation);
+          } catch (_) {}
+        }
+        if (!response.data!.deviceTokenRegistered) {
+          debugPrint('Login OK but device not registered for push '
+              '(token sent: ${device != null}).');
+        }
         _accessToken = response.data!.accessToken;
         _refreshToken = response.data!.refreshToken;
         rpcClient.token = _accessToken;

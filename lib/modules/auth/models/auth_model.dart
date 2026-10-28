@@ -34,11 +34,15 @@ class AuthResponseData {
   final String accessToken;
   final String? refreshToken;
   final UserAuthModel user;
+  final String? installationId;
+  final bool deviceTokenRegistered;
 
   const AuthResponseData({
     required this.accessToken,
     this.refreshToken,
     required this.user,
+    this.installationId,
+    this.deviceTokenRegistered = false,
   });
 
   /// Backend returns the user fields flat alongside the tokens
@@ -51,6 +55,8 @@ class AuthResponseData {
       user: UserAuthModel.fromJson(
         json['user'] as Map<String, dynamic>? ?? json,
       ),
+      installationId: json['installation_id'] as String?,
+      deviceTokenRegistered: json['device_token_registered'] as bool? ?? false,
     );
   }
 
@@ -71,17 +77,23 @@ class LoginRequest {
   final String? deviceToken;
   final String? deviceType;
 
+  /// Returned by the BE on first login; resend so one phone stays one device.
+  final String? installationId;
+
   const LoginRequest({
     required this.email,
     required this.password,
     this.deviceToken,
     this.deviceType,
+    this.installationId,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'email': email,
       'password': password,
+      if (installationId != null && installationId!.isNotEmpty)
+        'installation_id': installationId,
       if (deviceToken != null && deviceType != null) ...{
         'device_token': deviceToken,
         'device_type': deviceType,

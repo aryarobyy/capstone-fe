@@ -7,6 +7,8 @@ import 'package:tanipintar/core/network/rpc_client.dart';
 import 'package:tanipintar/modules/area/providers/area_provider.dart';
 import 'package:tanipintar/modules/area/services/area_service.dart';
 import 'package:tanipintar/modules/area/services/sensor_service.dart';
+import 'package:tanipintar/modules/monitoring/models/alert_rule_model.dart';
+import 'package:tanipintar/modules/monitoring/services/monitoring_service.dart';
 
 /// Real payloads captured from https://arifingaybanget.cipicung.id/api
 const _areaList = '[{"id":1,"name":"Area Uji"}]';
@@ -146,21 +148,40 @@ void main() {
     expect(provider.sensorAreaFilter, isNull);
   });
 
-  test('a 404 on area update/delete keeps the list and explains why', () async {
+  test('a 404 on area update/delete keeps the list and shows the BE error', () async {
     final provider = _providerWith(
       (req) async => req.url.path.endsWith('/areas/list')
           ? http.Response(_areaList, 200)
-          : http.Response('404 page not found', 404),
+          : http.Response('{"error":"area not found"}', 404),
     );
     await provider.fetchAreas();
 
     expect(await provider.updateArea(id: 1, name: 'Area Ubah'), isFalse);
-    expect(provider.errorMessage, 'Ubah area belum tersedia di server.');
+    expect(provider.errorMessage, 'area not found');
     expect(provider.areas.single.name, 'Area Uji');
 
     expect(await provider.deleteArea(1), isFalse);
-    expect(provider.errorMessage, 'Hapus area belum tersedia di server.');
+    expect(provider.errorMessage, 'area not found');
     expect(provider.areas, hasLength(1));
+  });
+
+  test('alert rule save hits /alerts/rules/save and survives 204', () async {
+    final seen = <http.Request>[];
+    final rpc = RpcClient(
+      baseUrl: 'https://example.test',
+      httpClient: MockClient((req) async {
+        seen.add(req);
+        return http.Response('', 204);
+      }),
+    );
+    const rule = AlertRuleModel(
+        sensorId: 2, parameter: 'temperature', minValue: 10, maxValue: 40);
+    final res = await MonitoringService(rpcClient: rpc).saveAlertRule(rule);
+
+    expect(res.success, isTrue);
+    expect(res.data, same(rule));
+    expect(seen.single.url.path, '/api/alerts/rules/save');
+    expect(jsonDecode(seen.single.body)['max_gap_seconds'], 300);
   });
 
   test('area mutations on an unknown id fail loudly', () async {

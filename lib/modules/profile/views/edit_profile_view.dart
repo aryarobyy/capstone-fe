@@ -49,7 +49,7 @@ class _EditProfileViewState extends State<EditProfileView> {
     final success = await provider.updateProfile(
       id: profile.id,
       name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
+      email: _emailController.text.trim().toLowerCase(),
     );
 
     if (success && mounted) {

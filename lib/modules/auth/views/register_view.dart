@@ -54,7 +54,8 @@ class _RegisterViewState extends State<RegisterView> {
     // Build the RegisterRequest input model
     final registerRequest = RegisterRequest(
       name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
+      // BE matched email case-sensitively; keyboards auto-capitalise the first letter.
+      email: _emailController.text.trim().toLowerCase(),
       msisdn: _msisdnController.text.trim(),
       password: _passwordController.text,
     );
