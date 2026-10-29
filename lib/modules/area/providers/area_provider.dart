@@ -68,11 +68,11 @@ class AreaProvider extends ChangeNotifier {
 
   /// Loads areas and sensors together, the state the area screen needs.
   Future<void> loadAll() async {
-    await fetchAreas();
+    if (!await fetchAreas()) return;
     await fetchSensors(areaId: _sensorAreaFilter);
   }
 
-  Future<void> fetchAreas() async {
+  Future<bool> fetchAreas() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -80,10 +80,13 @@ class AreaProvider extends ChangeNotifier {
     try {
       _areas = await areaService.getAreaList();
       _totalAreas = _areas.length;
+      return true;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
+      return false;
     } catch (e) {
       _errorMessage = 'Gagal memuat data lahan: $e';
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();
