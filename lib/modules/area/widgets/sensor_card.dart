@@ -8,6 +8,7 @@ class SensorCard extends StatelessWidget {
   final SensorModel sensor;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onConfigureAlert;
 
   /// Readable area name. Falls back to `Area <id>` when null.
   final String? areaName;
@@ -17,6 +18,7 @@ class SensorCard extends StatelessWidget {
     required this.sensor,
     this.onEdit,
     this.onDelete,
+    this.onConfigureAlert,
     this.areaName,
   });
 
@@ -48,7 +50,17 @@ class SensorCard extends StatelessWidget {
                   color: AppColors.backgroundCanvas, // Light gray neutral
                   borderRadius: BorderRadius.circular(12.0),
                 ),
-                child: const Icon(Icons.memory, size: 48, color: AppColors.textHint),
+                child: Stack(children: [
+                  const Center(child: Icon(Icons.memory, size: 48, color: AppColors.textHint)),
+                  if (onConfigureAlert != null) Positioned(
+                    top: 0, right: 0,
+                    child: IconButton(
+                      tooltip: 'Aturan peringatan',
+                      onPressed: onConfigureAlert,
+                      icon: const Icon(Icons.notifications_active_outlined, color: AppColors.areaAccent),
+                    ),
+                  ),
+                ]),
               ),
             ),
             const SizedBox(height: 8),

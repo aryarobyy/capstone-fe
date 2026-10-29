@@ -1,10 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tanipintar/modules/area/views/area_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:tanipintar/core/network/rpc_client.dart';
 import 'package:tanipintar/modules/area/providers/area_provider.dart';
+import 'package:tanipintar/modules/home/services/home_service.dart';
 import 'package:tanipintar/modules/area/services/area_service.dart';
 import 'package:tanipintar/modules/area/services/sensor_service.dart';
 import 'package:tanipintar/modules/monitoring/models/alert_rule_model.dart';
@@ -48,6 +52,87 @@ void main() {
     expect(provider.areas.single.id, 1);
     expect(provider.areas.single.name, 'Area Uji');
     expect(provider.totalAreas, 1);
+  });
+
+  test('fetchAreas reads the deployed API envelope', () async {
+    final provider = _providerWith((_) async => http.Response(
+      '{"success":true,"message":"Areas retrieved successfully",'
+      '"data":[{"id":4,"name":"p"},{"id":5,"name":"arae 1"}]}', 200));
+    await provider.fetchAreas();
+    expect(provider.errorMessage, isNull);
+    expect(provider.areas.map((a) => a.id), [4, 5]);
+    expect(provider.totalAreas, 2);
+  });
+
+  test('fetchAreas accepts an empty envelope with omitted data', () async {
+    final provider = _providerWith((_) async => http.Response(
+      '{"success":true,"message":"Areas retrieved successfully"}', 200));
+    await provider.fetchAreas();
+    expect(provider.errorMessage, isNull);
+    expect(provider.areas, isEmpty);
+  });
+
+  test('createArea reads the id inside the deployed API envelope', () async {
+    final provider = _providerWith((_) async => http.Response(
+      '{"success":true,"message":"Area created successfully",'
+      '"data":{"id":7,"name":"Area Baru"}}', 201));
+    expect(await provider.createArea(name: 'Area Baru'), isTrue);
+    expect(provider.areas.single.id, 7);
+  });
+
+  test('dashboard counts areas from the deployed API envelope', () async {
+    final rpc = RpcClient(baseUrl: 'https://example.test', httpClient: MockClient((req) async {
+      if (req.url.path.endsWith('/areas/list')) {
+        return http.Response('{"success":true,"data":[{"id":4,"name":"p"},{"id":5,"name":"arae 1"}]}', 200);
+      }
+      return http.Response('{"success":true,"data":{"data":[],"total":0,"limit":1,"index":0}}', 200);
+    }));
+    expect((await HomeService(rpcClient: rpc).getDashboardSummary()).totalAreas, 2);
+  });
+
+  test('area errors in a 200 envelope remain visible during loadAll', () async {
+    final requests = <http.Request>[];
+    final provider = _providerWith((req) async => http.Response(
+      req.url.path.endsWith('/areas/list')
+        ? '{"success":false,"message":"Area tidak dapat dimuat"}'
+        : '{"success":true,"data":{"data":[],"total":0}}', 200), seen: requests);
+    await provider.loadAll();
+    expect(provider.errorMessage, 'Area tidak dapat dimuat');
+    expect(requests.map((r) => r.url.path), ['/api/areas/list']);
+  });
+
+  test('malformed area data is reported instead of silently dropped', () async {
+    for (final data in ['{}', '[{"id":4,"name":"p"},null]']) {
+      final provider = _providerWith((_) async => http.Response(
+        '{"success":true,"data":$data}', 200));
+      await provider.fetchAreas();
+      expect(provider.errorMessage, 'Format daftar area dari server tidak valid.');
+    }
+  });
+
+  test('reloading areas replaces results from the preceding request', () async {
+    var calls = 0;
+    final provider = _providerWith((_) async => http.Response(
+      ++calls == 1 ? _areaList
+        : '{"success":true,"data":[{"id":5,"name":"arae 1"}]}', 200));
+    await provider.fetchAreas();
+    await provider.fetchAreas();
+    expect(provider.areas.single.id, 5);
+    expect(provider.totalAreas, 1);
+  });
+
+  testWidgets('area screen renders both areas returned by the deployed API', (tester) async {
+    final provider = _providerWith((req) async => http.Response(
+      req.url.path.endsWith('/areas/list')
+        ? '{"success":true,"data":[{"id":4,"name":"p"},{"id":5,"name":"arae 1"}]}'
+        : _sensorList, 200));
+    await tester.pumpWidget(ChangeNotifierProvider.value(value: provider,
+      child: const MaterialApp(home: AreaScreen())));
+    await tester.pumpAndSettle();
+    expect(find.text('p'), findsOneWidget);
+    expect(find.text('arae 1'), findsOneWidget);
+    expect(find.text('Belum ada data area.'), findsNothing);
+    expect(provider.errorMessage, isNull);
   });
 
   test('fetchSensors parses the enveloped paginated sensor list', () async {

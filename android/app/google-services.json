@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "88064190389",
+    "project_id": "capstone-fcm-8633e",
+    "storage_bucket": "capstone-fcm-8633e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88064190389:android:66390398c41ba62bc6dbfc",
+        "android_client_info": {
+          "package_name": "com.example.tanipintar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQS4v7jkEg7R-iegV6hsAO9Vqgxuw8VCQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

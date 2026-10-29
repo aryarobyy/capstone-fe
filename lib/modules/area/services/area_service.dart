@@ -2,11 +2,7 @@ import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/rpc_client.dart';
 import '../models/area_model.dart';
 
-/// Area endpoints answer with bare JSON instead of the standard envelope:
-/// - `POST /areas/list`   -> `[{"id":1,"name":"Area Uji"}]`
-/// - `POST /areas/create` -> `{"id":1}` (201)
-///
-/// ponytail: no detail endpoint here, `/areas/detail` still returns 404.
+/// Accepts both the API response envelope and older bare area responses.
 /// BE `/areas/update` only stores `name`; description/location are ignored.
 class AreaService {
   final RpcClient rpcClient;
@@ -14,12 +10,25 @@ class AreaService {
   AreaService({required this.rpcClient});
 
   Future<List<AreaModel>> getAreaList() async {
-    final decoded = await rpcClient.callRaw(procedure: ApiEndpoints.areaList);
+    final response = await rpcClient.call(procedure: ApiEndpoints.areaList);
 
-    final list = decoded is List ? decoded : const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(AreaModel.fromJson)
+    if (response['success'] != true) {
+      throw RpcException(
+        statusCode: 0,
+        message: response['message'] as String? ?? 'Gagal memuat area.',
+      );
+    }
+    // Empty slices are omitted by the deployed API's JSON envelope.
+    final data = response['data'];
+    if (data == null) return [];
+    if (data is! List || data.any((item) => item is! Map<String, dynamic>)) {
+      throw const RpcException(
+        statusCode: 0,
+        message: 'Format daftar area dari server tidak valid.',
+      );
+    }
+    return data
+        .map((item) => AreaModel.fromJson(item as Map<String, dynamic>))
         .toList();
   }
 
@@ -38,8 +47,12 @@ class AreaService {
       },
     );
 
-    if (decoded is Map<String, dynamic> && decoded['id'] is int) {
-      return decoded['id'] as int;
+    final area = decoded is Map<String, dynamic> &&
+            decoded['data'] is Map<String, dynamic>
+        ? decoded['data'] as Map<String, dynamic>
+        : decoded;
+    if (area is Map<String, dynamic> && area['id'] is int) {
+      return area['id'] as int;
     }
     throw const RpcException(
       statusCode: 0,
