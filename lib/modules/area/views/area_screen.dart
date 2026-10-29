@@ -9,7 +9,6 @@ import '../widgets/area_card.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/add_area_modal.dart';
 import '../widgets/add_sensor_modal.dart';
-import '../../monitoring/widgets/alert_rule_dialog.dart';
 
 class AreaScreen extends StatefulWidget {
   static const routeName = '/area';
@@ -328,11 +327,6 @@ class _AreaScreenState extends State<AreaScreen> {
           areaName: provider.areaNameOf(sensor.areaId),
           onEdit: () => _openModal(AddSensorModal(sensor: sensor)),
           onDelete: () => _deleteSensor(sensor),
-          onConfigureAlert: () => showDialog<void>(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => AlertRuleDialog(sensor: sensor),
-          ),
         );
       },
     );

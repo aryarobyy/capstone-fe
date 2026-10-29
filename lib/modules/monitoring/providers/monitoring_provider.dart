@@ -12,8 +12,6 @@ class MonitoringProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isGeneratingKey = false;
   bool _isSavingRule = false;
-  bool _isLoadingRules = false;
-  String? _ruleErrorMessage;
   String? _errorMessage;
 
   int? _selectedSensorId;
@@ -24,8 +22,6 @@ class MonitoringProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isGeneratingKey => _isGeneratingKey;
   bool get isSavingRule => _isSavingRule;
-  bool get isLoadingRules => _isLoadingRules;
-  String? get ruleErrorMessage => _ruleErrorMessage;
   String? get errorMessage => _errorMessage;
 
   int? get selectedSensorId => _selectedSensorId;
@@ -106,39 +102,20 @@ class MonitoringProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> fetchAlertRules(int sensorId) async {
-    _selectedSensorId = sensorId;
-    _alertRules = [];
-    _isLoadingRules = true;
-    _ruleErrorMessage = null;
-    notifyListeners();
+  Future<void> fetchAlertRules(int sensorId) async {
     try {
       final response = await monitoringService.getAlertRules(sensorId);
-      if (_selectedSensorId != sensorId) return false;
-      if (!response.success) {
-        _ruleErrorMessage = response.message;
-        return false;
-      }
-      _alertRules = response.data ?? [];
-      return true;
-    } on RpcException catch (e) {
-      if (_selectedSensorId == sensorId) _ruleErrorMessage = e.toString();
-      return false;
-    } catch (e) {
-      if (_selectedSensorId == sensorId) _ruleErrorMessage = 'Gagal memuat aturan: $e';
-      return false;
-    } finally {
-      if (_selectedSensorId == sensorId) {
-        _isLoadingRules = false;
+      if (response.success && response.data != null) {
+        _alertRules = response.data!;
         notifyListeners();
       }
+    } catch (_) {
     }
   }
 
   Future<bool> saveAlertRule(AlertRuleModel rule) async {
     _isSavingRule = true;
     _errorMessage = null;
-    _ruleErrorMessage = null;
     notifyListeners();
 
     try {
@@ -156,20 +133,17 @@ class MonitoringProvider extends ChangeNotifier {
       } else {
         _errorMessage = response.message;
         _isSavingRule = false;
-        _ruleErrorMessage = _errorMessage;
         notifyListeners();
         return false;
       }
     } on RpcException catch (e) {
       _errorMessage = e.toString();
       _isSavingRule = false;
-      _ruleErrorMessage = _errorMessage;
       notifyListeners();
       return false;
     } catch (e) {
       _errorMessage = 'Gagal menyimpan aturan alarm: $e';
       _isSavingRule = false;
-      _ruleErrorMessage = _errorMessage;
       notifyListeners();
       return false;
     }

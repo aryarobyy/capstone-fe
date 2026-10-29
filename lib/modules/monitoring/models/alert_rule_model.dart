@@ -2,11 +2,10 @@ class AlertRuleModel {
   final int? id;
   final int sensorId;
   final String parameter;
-  final double? minValue;
-  final double? maxValue;
+  final double minValue;
+  final double maxValue;
   final int durationSeconds;
   final int cooldownSeconds;
-  final int maxGapSeconds;
   final bool enabled;
 
   const AlertRuleModel({
@@ -17,7 +16,6 @@ class AlertRuleModel {
     required this.maxValue,
     this.durationSeconds = 300,
     this.cooldownSeconds = 600,
-    this.maxGapSeconds = 300,
     this.enabled = true,
   });
 
@@ -26,11 +24,10 @@ class AlertRuleModel {
       id: json['id'] as int?,
       sensorId: json['sensor_id'] as int? ?? 0,
       parameter: json['parameter'] as String? ?? '',
-      minValue: (json['min_value'] as num?)?.toDouble(),
-      maxValue: (json['max_value'] as num?)?.toDouble(),
+      minValue: (json['min_value'] as num?)?.toDouble() ?? 0.0,
+      maxValue: (json['max_value'] as num?)?.toDouble() ?? 100.0,
       durationSeconds: json['duration_seconds'] as int? ?? 300,
       cooldownSeconds: json['cooldown_seconds'] as int? ?? 600,
-      maxGapSeconds: json['max_gap_seconds'] as int? ?? 300,
       enabled: json['enabled'] as bool? ?? true,
     );
   }
@@ -44,7 +41,6 @@ class AlertRuleModel {
       'max_value': maxValue,
       'duration_seconds': durationSeconds,
       'cooldown_seconds': cooldownSeconds,
-      'max_gap_seconds': maxGapSeconds,
       'enabled': enabled,
     };
   }
@@ -57,7 +53,6 @@ class AlertRuleModel {
     double? maxValue,
     int? durationSeconds,
     int? cooldownSeconds,
-    int? maxGapSeconds,
     bool? enabled,
   }) {
     return AlertRuleModel(
@@ -68,7 +63,6 @@ class AlertRuleModel {
       maxValue: maxValue ?? this.maxValue,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       cooldownSeconds: cooldownSeconds ?? this.cooldownSeconds,
-      maxGapSeconds: maxGapSeconds ?? this.maxGapSeconds,
       enabled: enabled ?? this.enabled,
     );
   }
