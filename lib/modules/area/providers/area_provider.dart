@@ -96,33 +96,14 @@ class AreaProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> createArea({
-    required String name,
-    String? description,
-    String? location,
-  }) async {
+  Future<bool> createArea({required String name}) async {
     _isSaving = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final id = await areaService.createArea(
-        name: name,
-        description: description,
-        location: location,
-      );
-
-      // Create only returns the id, so insert locally with what we sent.
-      _areas.insert(
-        0,
-        AreaModel(
-          id: id,
-          name: name,
-          description: description,
-          location: location,
-        ),
-      );
-      _totalAreas++;
+      _areas.insert(0, await areaService.createArea(name: name));
+      _totalAreas = _areas.length;
       return true;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
@@ -136,13 +117,9 @@ class AreaProvider extends ChangeNotifier {
     }
   }
 
-  /// `/areas/update` returns no body, so the local area is patched with the
-  /// values we just sent once the server accepts them.
   Future<bool> updateArea({
     required int id,
     required String name,
-    String? description,
-    String? location,
   }) async {
     final idx = _areas.indexWhere((a) => a.id == id);
     if (idx < 0) {
@@ -156,18 +133,9 @@ class AreaProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await areaService.updateArea(
-        id: id,
-        name: name,
-        description: description,
-        location: location,
-      );
-
-      _areas[idx] = _areas[idx].copyWith(
-        name: name,
-        description: description,
-        location: location,
-      );
+      final updated = await areaService.updateArea(id: id, name: name);
+      // Keep the locally tracked sensor count; the server never sends it.
+      _areas[idx] = updated.copyWith(sensorsCount: _areas[idx].sensorsCount);
       return true;
     } on RpcException catch (e) {
       _errorMessage = e.toString();

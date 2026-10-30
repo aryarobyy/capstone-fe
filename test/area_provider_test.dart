@@ -15,8 +15,15 @@ import 'package:tanipintar/modules/monitoring/models/alert_rule_model.dart';
 import 'package:tanipintar/modules/monitoring/services/monitoring_service.dart';
 
 /// Real payloads captured from https://arifingaybanget.cipicung.id/api
-const _areaList = '[{"id":1,"name":"Area Uji"}]';
-const _areaCreate = '{"id":7}';
+const _areaList = '{"success":true,"message":"Areas retrieved successfully",'
+    '"data":[{"id":1,"name":"Area Uji"}]}';
+const _areaCreate = '{"success":true,"message":"Area created successfully",'
+    '"data":{"id":7,"name":"Area Baru"}}';
+const _areaUpdate = '{"success":true,"message":"Area updated successfully",'
+    '"data":{"id":1,"name":"Area Ubah"}}';
+const _areaDelete =
+    '{"success":true,"message":"Area deleted successfully"}';
+const _areaNotFound = '{"success":false,"message":"area not found"}';
 const _sensorList = '{"success":true,"message":"Sensors retrieved successfully",'
     '"data":{"data":[{"id":2,"area_id":1,"owner_id":12,"name":"ESP32 Uji",'
     '"code":"ESP32-001","description":"tes",'
@@ -43,7 +50,7 @@ AreaProvider _providerWith(
 }
 
 void main() {
-  test('fetchAreas parses the bare JSON array from /areas/list', () async {
+  test('fetchAreas parses the /areas/list envelope', () async {
     final provider = _providerWith((_) async => http.Response(_areaList, 200));
 
     await provider.fetchAreas();
@@ -151,18 +158,23 @@ void main() {
     expect(jsonDecode(requests.single.body)['area_id'], 1);
   });
 
-  test('createArea inserts the area locally using the returned id', () async {
+  test('createArea inserts the area returned by the server', () async {
+    final requests = <http.Request>[];
     final provider = _providerWith(
       (req) async => req.url.path.endsWith('/areas/create')
           ? http.Response(_areaCreate, 201)
           : http.Response(_areaList, 200),
+      seen: requests,
     );
 
-    final ok = await provider.createArea(name: 'Area Baru', location: 'Blok A');
+    final ok = await provider.createArea(name: 'Area Baru');
 
     expect(ok, isTrue);
+    // Only `name` is accepted; anything else is dropped by the backend.
+    expect(jsonDecode(requests.single.body), {'name': 'Area Baru'});
     expect(provider.areas.first.id, 7);
     expect(provider.areas.first.name, 'Area Baru');
+    expect(provider.totalAreas, 1);
   });
 
   test('createSensor surfaces validation errors from the API', () async {
@@ -176,31 +188,55 @@ void main() {
     expect(provider.sensors, isEmpty);
   });
 
-  test('updateArea posts to /areas/update and patches the area', () async {
+  test('updateArea posts to /areas/update and stores the response', () async {
     final requests = <http.Request>[];
     final provider = _providerWith(
       (req) async => req.url.path.endsWith('/areas/update')
-          ? http.Response('', 204)
+          ? http.Response(_areaUpdate, 200)
           : http.Response(_areaList, 200),
       seen: requests,
     );
     await provider.fetchAreas();
 
-    final ok = await provider.updateArea(
-      id: 1,
-      name: 'Area Ubah',
-      location: 'Blok B',
-    );
+    final ok = await provider.updateArea(id: 1, name: 'Area Ubah');
 
     expect(ok, isTrue);
     expect(requests.last.url.path, endsWith('/areas/update'));
-    expect(jsonDecode(requests.last.body), {
-      'id': 1,
-      'name': 'Area Ubah',
-      'location': 'Blok B',
-    });
+    expect(jsonDecode(requests.last.body), {'id': 1, 'name': 'Area Ubah'});
+    expect(provider.areas.single.id, 1);
     expect(provider.areas.single.name, 'Area Ubah');
-    expect(provider.areas.single.location, 'Blok B');
+  });
+
+  test('updateArea keeps the locally derived sensor count', () async {
+    final provider = _providerWith(
+      (req) async {
+        if (req.url.path.endsWith('/sensor/list')) {
+          return http.Response(_sensorList, 200);
+        }
+        return http.Response(
+          req.url.path.endsWith('/areas/update') ? _areaUpdate : _areaList,
+          200,
+        );
+      },
+    );
+    await provider.loadAll();
+    expect(provider.sensorCountOf(1), 1);
+
+    expect(await provider.updateArea(id: 1, name: 'Area Ubah'), isTrue);
+    expect(provider.sensorCountOf(1), 1);
+  });
+
+  test('a failing envelope on 200 is still treated as an error', () async {
+    final provider = _providerWith(
+      (req) async => req.url.path.endsWith('/areas/list')
+          ? http.Response(_areaList, 200)
+          : http.Response(_areaNotFound, 200),
+    );
+    await provider.fetchAreas();
+
+    expect(await provider.updateArea(id: 1, name: 'Area Ubah'), isFalse);
+    expect(provider.errorMessage, 'area not found');
+    expect(provider.areas.single.name, 'Area Uji');
   });
 
   test('deleteArea drops the area, its sensors and the filter', () async {
@@ -211,7 +247,7 @@ void main() {
           return http.Response(_sensorList, 200);
         }
         if (req.url.path.endsWith('/areas/delete')) {
-          return http.Response('', 204);
+          return http.Response(_areaDelete, 200);
         }
         return http.Response(_areaList, 200);
       },
@@ -237,7 +273,7 @@ void main() {
     final provider = _providerWith(
       (req) async => req.url.path.endsWith('/areas/list')
           ? http.Response(_areaList, 200)
-          : http.Response('{"error":"area not found"}', 404),
+          : http.Response(_areaNotFound, 404),
     );
     await provider.fetchAreas();
 
@@ -270,7 +306,10 @@ void main() {
   });
 
   test('area mutations on an unknown id fail loudly', () async {
-    final provider = _providerWith((_) async => http.Response('[]', 200));
+    final provider = _providerWith((_) async => http.Response(
+      '{"success":true,"message":"Areas retrieved successfully","data":[]}',
+      200,
+    ));
     await provider.fetchAreas();
 
     expect(await provider.updateArea(id: 99, name: 'x'), isFalse);

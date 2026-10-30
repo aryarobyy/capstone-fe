@@ -14,8 +14,10 @@ class RpcException implements Exception {
 
   @override
   String toString() {
-    if (errors.isNotEmpty) {
-      return '$message: ${errors.join(", ")}';
+    // Some endpoints echo `message` inside `errors`; don't say it twice.
+    final details = errors.where((e) => e != message);
+    if (details.isNotEmpty) {
+      return '$message: ${details.join(", ")}';
     }
     return message;
   }
@@ -125,9 +127,7 @@ class RpcClient {
         message: asMap?['message'] as String? ??
             asMap?['error'] as String? ??
             'Terjadi kesalahan pada server.',
-        errors: asMap?['errors'] is List
-            ? List<String>.from(asMap!['errors'] as List)
-            : const [],
+        errors: _parseErrors(asMap?['errors']),
       );
     } on http.ClientException catch (e) {
       throw RpcException(
@@ -140,6 +140,16 @@ class RpcClient {
         message: 'Respons dari server bukan format JSON yang valid.',
       );
     }
+  }
+
+  /// `errors` varies per module: a list of strings, a single string (areas), or
+  /// a field -> message map. Flatten whatever shape arrives.
+  static List<String> _parseErrors(dynamic errors) {
+    if (errors == null) return const [];
+    if (errors is List) return errors.map((e) => '$e').toList();
+    if (errors is Map) return errors.values.map((e) => '$e').toList();
+    final text = '$errors'.trim();
+    return text.isEmpty ? const [] : [text];
   }
 
   /// Opens a Server-Sent Events endpoint and yields each event's JSON `data`.

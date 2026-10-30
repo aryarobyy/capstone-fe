@@ -19,8 +19,6 @@ class AddAreaModal extends StatefulWidget {
 class _AddAreaModalState extends State<AddAreaModal> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _descriptionController = TextEditingController();
 
   bool get _isEdit => widget.area != null;
 
@@ -30,16 +28,12 @@ class _AddAreaModalState extends State<AddAreaModal> {
     final area = widget.area;
     if (area != null) {
       _nameController.text = area.name;
-      _locationController.text = area.location ?? '';
-      _descriptionController.text = area.description ?? '';
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _locationController.dispose();
-    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -49,21 +43,11 @@ class _AddAreaModalState extends State<AddAreaModal> {
     final provider = context.read<AreaProvider>();
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
-    final location = _locationController.text.trim();
-    final description = _descriptionController.text.trim();
+    final name = _nameController.text.trim();
 
     final success = _isEdit
-        ? await provider.updateArea(
-            id: widget.area!.id,
-            name: _nameController.text.trim(),
-            location: location.isNotEmpty ? location : null,
-            description: description.isNotEmpty ? description : null,
-          )
-        : await provider.createArea(
-            name: _nameController.text.trim(),
-            location: location.isNotEmpty ? location : null,
-            description: description.isNotEmpty ? description : null,
-          );
+        ? await provider.updateArea(id: widget.area!.id, name: name)
+        : await provider.createArea(name: name);
 
     if (success) {
       navigator.pop(true);
@@ -132,24 +116,12 @@ class _AddAreaModalState extends State<AddAreaModal> {
                   hintText: "Contoh: Area 1",
                   controller: _nameController,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Nama area tidak boleh kosong';
-                    }
+                    final name = value?.trim() ?? '';
+                    if (name.isEmpty) return 'Nama area tidak boleh kosong';
+                    // Server rejects anything longer with a 400.
+                    if (name.length > 255) return 'Nama area maksimal 255 karakter';
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
-                  label: "Lokasi (Opsional)",
-                  hintText: "Contoh: Blok A",
-                  controller: _locationController,
-                ),
-                const SizedBox(height: 16),
-                AppTextField(
-                  label: "Deskripsi (Opsional)",
-                  hintText: "Masukkan deskripsi area",
-                  controller: _descriptionController,
-                  maxLines: 3,
                 ),
                 const SizedBox(height: 32),
                 AppButton(
