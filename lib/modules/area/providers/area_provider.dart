@@ -330,8 +330,11 @@ class AreaProvider extends ChangeNotifier {
     }
   }
 
-  String _messageOf(String message, List<String> errors) =>
-      errors.isEmpty ? message : '$message ${errors.join(", ")}';
+  /// Some endpoints echo `message` inside `errors`; don't say it twice.
+  String _messageOf(String message, List<String> errors) {
+    final details = errors.where((e) => e != message);
+    return details.isEmpty ? message : '$message ${details.join(", ")}';
+  }
 
   static const _maxActivities = 50;
   List<SensorActivityModel> _activities = [];

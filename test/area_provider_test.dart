@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tanipintar/modules/area/views/area_screen.dart';
+import 'package:tanipintar/modules/area/widgets/add_sensor_modal.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:tanipintar/core/network/rpc_client.dart';
@@ -30,6 +31,18 @@ const _sensorList = '{"success":true,"message":"Sensors retrieved successfully",
     '"created_at":"2026-10-20T17:07:53.673392+07:00",'
     '"updated_at":"2026-10-20T17:07:53.673392+07:00"}],'
     '"total":1,"limit":20,"index":0}}';
+/// Areas that do NOT contain the sensor fixture's area_id (1).
+const _areaListOther = '{"success":true,"message":"Areas retrieved successfully",'
+    '"data":[{"id":9,"name":"Area Lain"}]}';
+const _sensorCreate = '{"success":true,"message":"Sensor created successfully",'
+    '"data":{"id":11,"area_id":1,"owner_id":12,"name":"Sensor Baru",'
+    '"code":"ESP32-999","description":"tes",'
+    '"created_at":"2026-10-30T22:37:26.453894+07:00",'
+    '"updated_at":"2026-10-30T22:37:26.453894+07:00"}}';
+// The deployed API sends `errors` as a plain string, not a list.
+const _sensorCreateStringError = '{"success":false,'
+    '"message":"The \'name\' field is required.",'
+    '"errors":"The \'name\' field is required."}';
 const _sensorCreateError = '{"success":false,'
     '"message":"Validation failed for one or more fields.",'
     '"errors":["The \'name\' field is required."]}';
@@ -188,6 +201,59 @@ void main() {
     expect(provider.sensors, isEmpty);
   });
 
+  test('createSensor posts to /sensor/create and stores the 201 response',
+      () async {
+    final requests = <http.Request>[];
+    final provider = _providerWith(
+      (req) async => req.url.path.endsWith('/sensor/create')
+          ? http.Response(_sensorCreate, 201)
+          : http.Response(_areaList, 200),
+      seen: requests,
+    );
+
+    final ok = await provider.createSensor(
+      name: 'Sensor Baru',
+      code: 'ESP32-999',
+      areaId: 1,
+      description: 'tes',
+    );
+
+    expect(provider.errorMessage, isNull);
+    expect(ok, isTrue);
+    expect(requests.single.url.path, endsWith('/sensor/create'));
+    expect(jsonDecode(requests.single.body), {
+      'name': 'Sensor Baru',
+      'code': 'ESP32-999',
+      'area_id': 1,
+      'description': 'tes',
+    });
+    expect(provider.sensors.single.id, 11);
+    expect(provider.sensors.single.code, 'ESP32-999');
+    expect(provider.totalSensors, 1);
+  });
+
+  test('createSensor reports a string `errors` field from the API', () async {
+    final provider =
+        _providerWith((_) async => http.Response(_sensorCreateStringError, 400));
+
+    final ok = await provider.createSensor(name: '', code: '', areaId: 1);
+
+    expect(ok, isFalse);
+    expect(provider.errorMessage, "The 'name' field is required.");
+    expect(provider.sensors, isEmpty);
+  });
+
+  test('createSensor reports a rejected area_id', () async {
+    final provider = _providerWith((_) async => http.Response(
+      '{"success":false,"message":"The specified area does not exist."}', 400));
+
+    expect(
+      await provider.createSensor(name: 'N', code: 'X-2', areaId: 99999),
+      isFalse,
+    );
+    expect(provider.errorMessage, 'The specified area does not exist.');
+  });
+
   test('updateArea posts to /areas/update and stores the response', () async {
     final requests = <http.Request>[];
     final provider = _providerWith(
@@ -326,6 +392,117 @@ void main() {
     await provider.fetchAreas();
 
     expect(provider.errorMessage, 'valid access token required');
+  });
+
+  testWidgets('Tambah Sensor modal saves through the real UI path',
+      (tester) async {
+    final requests = <http.Request>[];
+    final client = MockClient((req) async {
+      requests.add(req);
+      if (req.url.path.endsWith('/sensor/create')) {
+        return http.Response(_sensorCreate, 201);
+      }
+      if (req.url.path.endsWith('/sensor/list')) {
+        return http.Response(_sensorList, 200);
+      }
+      return http.Response(_areaList, 200);
+    });
+    final rpc = RpcClient(baseUrl: 'https://example.test', httpClient: client);
+    final provider = AreaProvider(
+      areaService: AreaService(rpcClient: rpc),
+      sensorService: SensorService(rpcClient: rpc),
+    );
+
+    // Providers sit above MaterialApp, as in main.dart, so dialog routes can
+    // still read them.
+    await tester.pumpWidget(ChangeNotifierProvider<AreaProvider>.value(
+      value: provider,
+      child: const MaterialApp(home: AreaScreen()),
+    ));
+    await tester.pumpAndSettle();
+
+    // Switch to the Sensor tab, then open the create modal.
+    await tester.tap(find.text('Sensor').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tambah Sensor').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Contoh: Sensor Suhu 1'),
+        'Sensor Baru');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Contoh: ESP32-001'), 'ESP32-999');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AddSensorModal), findsOneWidget,
+        reason: 'create modal should be open');
+    expect(find.text('Simpan Sensor'), findsOneWidget,
+        reason: 'save button should be present');
+
+    // The modal scrolls; the button can sit below the fold on short screens.
+    await tester.ensureVisible(find.text('Simpan Sensor'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Simpan Sensor'));
+    await tester.pumpAndSettle();
+
+    expect(provider.errorMessage, isNull);
+    expect(
+      requests.any((r) => r.url.path.endsWith('/sensor/create')),
+      isTrue,
+      reason: 'tapping Simpan Sensor must POST /sensor/create; '
+          'paths=${requests.map((r) => r.url.path).toList()} '
+          'areas=${provider.areas.length} '
+          'pickArea=${find.text("Silakan pilih area terlebih dahulu").evaluate().length} '
+          'nameErr=${find.text("Nama sensor tidak boleh kosong").evaluate().length} '
+          'codeErr=${find.text("Kode sensor tidak boleh kosong").evaluate().length}',
+    );
+    expect(find.text('Berhasil menambahkan sensor'), findsOneWidget);
+  });
+
+  testWidgets('sensor modal survives an area_id missing from the area list',
+      (tester) async {
+    // A sensor can reference an area the list does not contain (deleted area,
+    // or an area outside the loaded page). DropdownButton asserts when its
+    // value has no matching item, which would take the whole screen down.
+    final client = MockClient((req) async => http.Response(
+          req.url.path.endsWith('/sensor/list') ? _sensorList : _areaListOther,
+          200,
+        ));
+    final rpc = RpcClient(baseUrl: 'https://example.test', httpClient: client);
+    final provider = AreaProvider(
+      areaService: AreaService(rpcClient: rpc),
+      sensorService: SensorService(rpcClient: rpc),
+    );
+    await provider.loadAll();
+
+    await tester.pumpWidget(ChangeNotifierProvider<AreaProvider>.value(
+      value: provider,
+      child: MaterialApp(
+        home: AddSensorModal(sensor: provider.sensors.single),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Edit Sensor'), findsOneWidget);
+  });
+
+  test('a success:false sensor envelope on 200 with string errors is handled',
+      () async {
+    // Guards ApiResponse against `errors` arriving as a string on a 2xx, which
+    // would otherwise throw a cast error instead of showing the message.
+    final provider = _providerWith((_) async => http.Response(
+          '{"success":false,"message":"Sensor not found.",'
+          '"errors":"Sensor not found."}',
+          200,
+        ));
+
+    expect(
+      await provider.updateSensor(
+          id: 999999, name: 'X', code: 'Y', areaId: 1),
+      isFalse,
+    );
+    expect(provider.errorMessage, 'Sensor not found.');
   });
 
   test('watchActivity reads SSE events newest first', () async {

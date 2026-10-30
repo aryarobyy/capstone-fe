@@ -21,10 +21,17 @@ class ApiResponse<T> {
       data: json['data'] != null && fromJsonT != null
           ? fromJsonT(json['data'])
           : json['data'] as T?,
-      errors: json['errors'] != null
-          ? List<String>.from(json['errors'] as List)
-          : const [],
+      errors: _parseErrors(json['errors']),
     );
+  }
+
+  /// `errors` is a list of strings on some endpoints and a plain string on
+  /// others (sensors, areas), so accept either instead of hard-casting.
+  static List<String> _parseErrors(dynamic errors) {
+    if (errors == null) return const [];
+    if (errors is List) return errors.map((e) => '$e').toList();
+    if (errors is Map) return errors.values.map((e) => '$e').toList();
+    return ['$errors'];
   }
 
   Map<String, dynamic> toJson(Map<String, dynamic> Function(T value)? toJsonT) {
