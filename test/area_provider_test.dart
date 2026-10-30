@@ -288,4 +288,30 @@ void main() {
 
     expect(provider.errorMessage, 'valid access token required');
   });
+
+  test('watchActivity reads SSE events newest first', () async {
+    final seen = <http.Request>[];
+    final provider = _providerWith(
+      (_) async => http.Response(
+        'event:reading\n'
+        'data:{"id":1,"sensor_id":9,"sensor_name":"Sensor Tanah","soil_moisture":2512,'
+        '"temperature":0,"humidity":0,"recorded_at":"2026-10-30T19:08:56+07:00"}\n\n'
+        ': ping\n\n'
+        'event:reading\n'
+        'data:{"id":2,"sensor_id":8,"sensor_name":"Sensor Cuaca","soil_moisture":0,'
+        '"temperature":29.1,"humidity":0,"recorded_at":"2026-10-30T19:09:06+07:00"}\n\n',
+        200,
+      ),
+      seen: seen,
+    );
+
+    provider.watchActivity(areaId: 5);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    provider.stopActivity();
+
+    expect(provider.activities.map((a) => a.id), [2, 1]);
+    expect(provider.activities.first.temperature, 29.1);
+    expect(seen.single.url.path, '/api/sensor-reading/stream');
+    expect(jsonDecode(seen.single.body), {'area_id': 5});
+  });
 }

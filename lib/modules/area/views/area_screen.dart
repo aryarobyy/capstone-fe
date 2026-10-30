@@ -4,6 +4,7 @@ import '../../../utils/colorScheme.dart';
 import '../../../widgets/app_button.dart';
 import '../providers/area_provider.dart';
 import '../models/area_model.dart';
+import '../models/sensor_activity_model.dart';
 import '../models/sensor_model.dart';
 import '../widgets/area_card.dart';
 import '../widgets/sensor_card.dart';
@@ -21,14 +22,24 @@ class AreaScreen extends StatefulWidget {
 }
 
 class _AreaScreenState extends State<AreaScreen> {
+  static const _activityTab = 2;
+
   int _selectedChipIndex = 0;
+  late final AreaProvider _areaProvider;
 
   @override
   void initState() {
     super.initState();
+    _areaProvider = context.read<AreaProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AreaProvider>().loadAll();
+      _areaProvider.loadAll();
     });
+  }
+
+  @override
+  void dispose() {
+    _areaProvider.stopActivity();
+    super.dispose();
   }
 
   Future<void> _refresh() => context.read<AreaProvider>().loadAll();
@@ -154,9 +165,11 @@ class _AreaScreenState extends State<AreaScreen> {
                     _buildChoiceChip("Area", 0),
                     const SizedBox(width: 8),
                     _buildChoiceChip("Sensor", 1),
+                    const SizedBox(width: 8),
+                    _buildChoiceChip("Aktivitas", _activityTab),
                   ],
                 ),
-                if (_selectedChipIndex == 1) // Only show on Sensor tab
+                if (_selectedChipIndex != 0) // Sensor and Aktivitas tabs
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
                     decoration: BoxDecoration(
@@ -197,9 +210,11 @@ class _AreaScreenState extends State<AreaScreen> {
                         ],
                         onChanged: (value) {
                           // 0 is the "Semua Area" sentinel -> no server filter.
-                          areaProvider.fetchSensors(
-                            areaId: (value == null || value == 0) ? null : value,
-                          );
+                          final areaId = (value == null || value == 0) ? null : value;
+                          areaProvider.fetchSensors(areaId: areaId);
+                          if (_selectedChipIndex == _activityTab) {
+                            areaProvider.watchActivity(areaId: areaId);
+                          }
                         },
                       ),
                     ),
@@ -210,27 +225,30 @@ class _AreaScreenState extends State<AreaScreen> {
           // List of Areas or Sensors
           Expanded(child: _buildBody(areaProvider)),
           // Tambah Button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 20.0),
-            child: AppButton(
-              text: _selectedChipIndex == 0 ? "Tambah Area" : "Tambah Sensor",
-              onPressed: () => _openModal(
-                _selectedChipIndex == 0
-                    ? const AddAreaModal()
-                    : AddSensorModal(initialAreaId: areaProvider.sensorAreaFilter),
+          if (_selectedChipIndex != _activityTab)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 20.0),
+              child: AppButton(
+                text: _selectedChipIndex == 0 ? "Tambah Area" : "Tambah Sensor",
+                onPressed: () => _openModal(
+                  _selectedChipIndex == 0
+                      ? const AddAreaModal()
+                      : AddSensorModal(initialAreaId: areaProvider.sensorAreaFilter),
+                ),
+                backgroundColor: AppColors.areaAccent,
+                textColor: Colors.white,
+                borderRadius: 24.0,
+                elevation: 1.0,
               ),
-              backgroundColor: AppColors.areaAccent,
-              textColor: Colors.white,
-              borderRadius: 24.0,
-              elevation: 1.0,
             ),
-          ),
         ],
       ),
     );
   }
 
   Widget _buildBody(AreaProvider provider) {
+    if (_selectedChipIndex == _activityTab) return _buildActivityList(provider);
+
     final isAreaTab = _selectedChipIndex == 0;
     final items = isAreaTab ? provider.areas : provider.sensors;
 
@@ -338,6 +356,60 @@ class _AreaScreenState extends State<AreaScreen> {
     );
   }
 
+  Widget _buildActivityList(AreaProvider provider) {
+    final items = provider.activities;
+    if (items.isEmpty) {
+      return _buildMessage("Menunggu data sensor...");
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.border),
+      itemBuilder: (context, index) {
+        final activity = items[index];
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.sensors, color: AppColors.areaAccent),
+          title: Text(
+            activity.sensorName.isNotEmpty
+                ? activity.sensorName
+                : "Sensor ${activity.sensorId}",
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          subtitle: Text(
+            _readingText(activity),
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          trailing: Text(
+            _clock(activity.recordedAt),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Each sensor measures one thing and reports 0 for the rest, so zeros are hidden.
+  String _readingText(SensorActivityModel a) {
+    String n(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    final parts = [
+      if (a.temperature != 0) "Suhu ${n(a.temperature)}°C",
+      if (a.humidity != 0) "Kelembapan ${n(a.humidity)}%",
+      if (a.soilMoisture != 0) "Tanah ${n(a.soilMoisture)}",
+    ];
+    return parts.isEmpty ? "Semua nilai 0" : parts.join(" · ");
+  }
+
+  String _clock(DateTime? t) {
+    if (t == null) return "-";
+    String two(int v) => v.toString().padLeft(2, '0');
+    return "${two(t.hour)}:${two(t.minute)}:${two(t.second)}";
+  }
+
   Widget _buildChoiceChip(String label, int index) {
     final isSelected = _selectedChipIndex == index;
     return ChoiceChip(
@@ -347,6 +419,11 @@ class _AreaScreenState extends State<AreaScreen> {
         setState(() {
           _selectedChipIndex = index;
         });
+        if (index == _activityTab) {
+          _areaProvider.watchActivity(areaId: _areaProvider.sensorAreaFilter);
+        } else {
+          _areaProvider.stopActivity();
+        }
       },
       selectedColor: AppColors.areaAccent,
       backgroundColor: Colors.white,

@@ -12,6 +12,8 @@ class ApiEndpoints {
 
   static const String sensorReadingList = '/sensor-reading/list';
   static const String sensorReadingDetail = '/sensor-reading/detail';
+  // Server-Sent Events: backlog of recent readings, then each new one.
+  static const String sensorReadingStream = '/sensor-reading/stream';
   static const String sensorsKey = '/sensors/key';
   // Bare JSON: list -> [rule, ...], save -> 204 no body.
   static const String alertRuleList = '/alerts/rules/list';
