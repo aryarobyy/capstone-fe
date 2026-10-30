@@ -50,4 +50,6 @@ flutter {
 
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("android/app/google-services.json missing: FCM disabled, login sends no device_token.")
 }

@@ -73,10 +73,7 @@ class RpcClient {
     required bool canRetry,
   }) async {
     final bearer = token ?? (getToken != null ? await getToken!() : null);
-
-    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-    final cleanProcedure = procedure.startsWith('/') ? procedure : '/$procedure';
-    final url = Uri.parse('$cleanBase/api$cleanProcedure');
+    final url = _url(procedure);
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -143,6 +140,49 @@ class RpcClient {
         message: 'Respons dari server bukan format JSON yang valid.',
       );
     }
+  }
+
+  /// Opens a Server-Sent Events endpoint and yields each event's JSON `data`.
+  /// Ends when the server closes the connection; the caller reconnects.
+  Stream<Map<String, dynamic>> stream({
+    required String procedure,
+    Map<String, dynamic>? params,
+  }) async* {
+    final bearer = token ?? (getToken != null ? await getToken!() : null);
+    final request = http.Request('POST', _url(procedure))
+      ..headers.addAll({
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+        if (bearer != null && bearer.isNotEmpty) 'Authorization': 'Bearer $bearer',
+      })
+      ..body = jsonEncode(params ?? {});
+
+    final response = await _httpClient.send(request);
+    if (response.statusCode != 200) {
+      throw RpcException(
+        statusCode: response.statusCode,
+        message: 'Gagal membuka stream (${response.statusCode}).',
+      );
+    }
+
+    final data = StringBuffer();
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+    await for (final line in lines) {
+      if (line.startsWith('data:')) {
+        data.write(line.substring(5).trimLeft());
+      } else if (line.isEmpty && data.isNotEmpty) {
+        yield jsonDecode(data.toString()) as Map<String, dynamic>;
+        data.clear();
+      }
+    }
+  }
+
+  Uri _url(String procedure) {
+    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final cleanProcedure = procedure.startsWith('/') ? procedure : '/$procedure';
+    return Uri.parse('$cleanBase/api$cleanProcedure');
   }
 
   void close() {

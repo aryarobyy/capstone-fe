@@ -63,7 +63,7 @@ class MonitoringService {
     );
 
     return ApiResponse<List<AlertRuleModel>>.fromJson(
-      responseMap,
+      {...responseMap, 'data': responseMap['data'] ?? <dynamic>[]},
       (data) {
         final list = (data is List) ? data : (data['data'] as List? ?? []);
         return list
@@ -73,15 +73,12 @@ class MonitoringService {
     );
   }
 
+  /// BE answers 204 with no body, so the saved rule is the one we sent.
   Future<ApiResponse<AlertRuleModel>> saveAlertRule(AlertRuleModel rule) async {
-    final responseMap = await rpcClient.call(
+    await rpcClient.callRaw(
       procedure: ApiEndpoints.alertRuleSave,
       params: rule.toJson(),
     );
-
-    return ApiResponse<AlertRuleModel>.fromJson(
-      responseMap,
-      (data) => AlertRuleModel.fromJson(data as Map<String, dynamic>),
-    );
+    return ApiResponse(success: true, message: '', data: rule);
   }
 }

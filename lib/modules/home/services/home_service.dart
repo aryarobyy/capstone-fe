@@ -2,6 +2,7 @@ import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/network/rpc_client.dart';
 import '../../riwayat/models/history_item_model.dart';
+import '../../area/services/area_service.dart';
 import '../models/home_dashboard_model.dart';
 
 /// ponytail: the server has no dashboard endpoint, so this fans out to the
@@ -36,11 +37,8 @@ class HomeService {
     );
   }
 
-  /// `/areas/list` answers with a bare array, not the envelope.
-  Future<int> _areaCount() async {
-    final decoded = await rpcClient.callRaw(procedure: ApiEndpoints.areaList);
-    return decoded is List ? decoded.length : 0;
-  }
+  Future<int> _areaCount() async =>
+      (await AreaService(rpcClient: rpcClient).getAreaList()).length;
 
   Future<PaginatedData<HistoryItemModel>> _history(Map<String, dynamic> params) =>
       _page(ApiEndpoints.historyList, params, HistoryItemModel.fromJson);

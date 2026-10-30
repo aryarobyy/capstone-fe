@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import '../../../core/network/rpc_client.dart';
 import '../models/area_model.dart';
+import '../models/sensor_activity_model.dart';
 import '../models/sensor_model.dart';
 import '../services/area_service.dart';
 import '../services/sensor_service.dart';
@@ -68,11 +71,11 @@ class AreaProvider extends ChangeNotifier {
 
   /// Loads areas and sensors together, the state the area screen needs.
   Future<void> loadAll() async {
-    await fetchAreas();
+    if (!await fetchAreas()) return;
     await fetchSensors(areaId: _sensorAreaFilter);
   }
 
-  Future<void> fetchAreas() async {
+  Future<bool> fetchAreas() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -80,10 +83,13 @@ class AreaProvider extends ChangeNotifier {
     try {
       _areas = await areaService.getAreaList();
       _totalAreas = _areas.length;
+      return true;
     } on RpcException catch (e) {
       _errorMessage = e.toString();
+      return false;
     } catch (e) {
       _errorMessage = 'Gagal memuat data lahan: $e';
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -358,4 +364,58 @@ class AreaProvider extends ChangeNotifier {
 
   String _messageOf(String message, List<String> errors) =>
       errors.isEmpty ? message : '$message ${errors.join(", ")}';
+
+  static const _maxActivities = 50;
+  List<SensorActivityModel> _activities = [];
+  StreamSubscription<SensorActivityModel>? _activitySub;
+  Timer? _activityRetry;
+
+  /// Live sensor readings, newest first.
+  List<SensorActivityModel> get activities => _activities;
+
+  /// Starts the live feed for [areaId] (null = all areas), replacing any previous one.
+  void watchActivity({int? areaId}) {
+    stopActivity();
+    _activities = [];
+    notifyListeners();
+    _connectActivity(areaId);
+  }
+
+  void _connectActivity(int? areaId) {
+    _activitySub = sensorService.watchActivity(areaId: areaId).listen(
+      (activity) {
+        // A reconnect replays the backlog, so skip readings already shown.
+        if (_activities.any((a) => a.id == activity.id)) return;
+        _activities = ([activity, ..._activities]
+              ..sort((a, b) => b.id.compareTo(a.id)))
+            .take(_maxActivities)
+            .toList();
+        notifyListeners();
+      },
+      onError: (_) => _retryActivity(areaId),
+      onDone: () => _retryActivity(areaId),
+      cancelOnError: true,
+    );
+  }
+
+  void _retryActivity(int? areaId) {
+    _activitySub = null;
+    _activityRetry = Timer(
+      const Duration(seconds: 3),
+      () => _connectActivity(areaId),
+    );
+  }
+
+  void stopActivity() {
+    _activityRetry?.cancel();
+    _activityRetry = null;
+    _activitySub?.cancel();
+    _activitySub = null;
+  }
+
+  @override
+  void dispose() {
+    stopActivity();
+    super.dispose();
+  }
 }

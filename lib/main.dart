@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/notifications/push_service.dart';
 import 'modules/auth/providers/auth_provider.dart';
 import 'modules/auth/views/login_view.dart';
 import 'modules/auth/views/register_view.dart';
@@ -8,8 +9,9 @@ import 'modules/navigation/views/main_screen.dart';
 import 'utils/app_providers.dart';
 import 'utils/colorScheme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initPush();
   runApp(const MyApp());
 }
 
@@ -31,6 +33,7 @@ class MyApp extends StatelessWidget {
       ),
       child: MaterialApp(
         navigatorKey: _navigatorKey,
+        scaffoldMessengerKey: pushMessengerKey,
         builder: (context, child) {
           context.read<AuthProvider>().onSessionExpired = () => _navigatorKey
               .currentState

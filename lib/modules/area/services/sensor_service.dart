@@ -1,12 +1,21 @@
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_response.dart';
 import '../../../core/network/rpc_client.dart';
+import '../models/sensor_activity_model.dart';
 import '../models/sensor_model.dart';
 
 class SensorService {
   final RpcClient rpcClient;
 
   SensorService({required this.rpcClient});
+
+  /// Live readings of the user's sensors, optionally limited to one area.
+  Stream<SensorActivityModel> watchActivity({int? areaId}) => rpcClient
+      .stream(
+        procedure: ApiEndpoints.sensorReadingStream,
+        params: {if (areaId != null) 'area_id': areaId},
+      )
+      .map(SensorActivityModel.fromJson);
 
   Future<ApiResponse<PaginatedData<SensorModel>>> getSensorList({
     int? areaId,
