@@ -21,11 +21,10 @@ class ApiEndpoints {
   static const String alertRuleList = '/alerts/rules/list';
   static const String alertRuleSave = '/alerts/rules/save';
 
-  // Area routes are plural and answer with bare JSON, not the usual envelope:
-  //   /areas/list   -> [{"id":1,"name":"Area Uji"}]
-  //   /areas/create -> {"id":7} (201)
-  //   /areas/update, /areas/delete -> {"message":...}; 404 {"error":"area not found"}
+  // RPC-over-POST, standard {success, message, data} envelope. An area is only
+  // {id, name}: any other field sent is accepted and silently dropped.
   static const String areaList = '/areas/list';
+  static const String areaDetail = '/areas/detail';
   static const String areaCreate = '/areas/create';
   static const String areaUpdate = '/areas/update';
   static const String areaDelete = '/areas/delete';

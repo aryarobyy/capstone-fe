@@ -200,7 +200,12 @@ class _AddSensorModalState extends State<AddSensorModal> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<int>(
-                      value: _selectedAreaId,
+                      // DropdownButton asserts unless the value matches exactly
+                      // one item, so fall back to the hint when the sensor's
+                      // area is not in the loaded list.
+                      value: provider.areas.any((a) => a.id == _selectedAreaId)
+                          ? _selectedAreaId
+                          : null,
                       hint: const Text(
                         "Pilih Area",
                         style: TextStyle(
