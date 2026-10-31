@@ -7,7 +7,7 @@ class HomeDashboardModel {
   final int totalSensors;
   final int totalAnomaliesToday;
 
-  /// Anomalies not yet back to `NORMAL` (FATAL + CRITICAL + WARNING).
+  /// Violations that are still ongoing (the server's `active` history filter).
   final int activeAnomalies;
   final List<HistoryItemModel> recentEvents;
 

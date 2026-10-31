@@ -110,6 +110,27 @@ void main() {
     expect((await HomeService(rpcClient: rpc).getDashboardSummary()).totalAreas, 2);
   });
 
+  test('dashboard counts active anomalies with the server active filter', () async {
+    final bodies = <Map<String, dynamic>>[];
+    final rpc = RpcClient(baseUrl: 'https://example.test', httpClient: MockClient((req) async {
+      if (req.url.path.endsWith('/areas/list')) {
+        return http.Response('{"success":true,"data":[]}', 200);
+      }
+      final body = jsonDecode(req.body) as Map<String, dynamic>;
+      bodies.add(body);
+      final total = body['active'] == true ? 3 : 40;
+      return http.Response('{"success":true,"data":{"data":[],"total":$total,"limit":1,"index":0}}', 200);
+    }));
+
+    final summary = await HomeService(rpcClient: rpc).getDashboardSummary();
+
+    expect(summary.activeAnomalies, 3);
+    expect(summary.totalAnomaliesToday, 40);
+    // No per-status fan-out any more: one `active` call.
+    expect(bodies.where((b) => b['active'] == true), hasLength(1));
+    expect(bodies.any((b) => b.containsKey('status')), isFalse);
+  });
+
   test('area errors in a 200 envelope remain visible during loadAll', () async {
     final requests = <http.Request>[];
     final provider = _providerWith((req) async => http.Response(
@@ -529,5 +550,44 @@ void main() {
     expect(provider.activities.first.temperature, 29.1);
     expect(seen.single.url.path, '/api/sensor-reading/stream');
     expect(jsonDecode(seen.single.body), {'area_id': 5});
+  });
+
+  group('deleteSensor', () {
+    Future<AreaProvider> withSensor(http.Response Function() onDelete, List<http.Request> seen) async {
+      final provider = _providerWith((req) async {
+        if (req.url.path.endsWith('/sensor/delete')) return onDelete();
+        return http.Response(_sensorList, 200);
+      }, seen: seen);
+      await provider.fetchSensors();
+      expect(provider.sensors, hasLength(1));
+      return provider;
+    }
+
+    test('removes the sensor the server deleted', () async {
+      final seen = <http.Request>[];
+      final provider = await withSensor(
+        () => http.Response('{"success":true,"message":"Sensor deleted successfully"}', 200),
+        seen,
+      );
+
+      expect(await provider.deleteSensor(2), isTrue);
+
+      expect(provider.sensors, isEmpty);
+      expect(provider.totalSensors, 0);
+      expect(seen.last.url.path, '/api/sensor/delete');
+      expect(jsonDecode(seen.last.body), {'id': 2});
+    });
+
+    test('a 404 keeps the sensor and shows the server message', () async {
+      final provider = await withSensor(
+        () => http.Response('{"success":false,"message":"Sensor not found."}', 404),
+        [],
+      );
+
+      expect(await provider.deleteSensor(2), isFalse);
+
+      expect(provider.sensors, hasLength(1));
+      expect(provider.errorMessage, 'Sensor not found.');
+    });
   });
 }
