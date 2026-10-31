@@ -9,6 +9,8 @@ class ApiEndpoints {
   static const String historyList = '/history/list';
   static const String historyDetail = '/history/detail';
   static const String historyDelete = '/history/delete';
+  // Server-Sent Events: anomalies recorded after `after_id` (0 = from now).
+  static const String historyStream = '/history/stream';
 
   static const String sensorReadingList = '/sensor-reading/list';
   static const String sensorReadingDetail = '/sensor-reading/detail';

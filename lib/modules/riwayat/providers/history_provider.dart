@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import '../../../core/network/rpc_client.dart';
 import '../models/history_filter_params.dart';
@@ -62,6 +64,7 @@ class HistoryProvider extends ChangeNotifier {
 
   Future<void> fetchHistories({bool refresh = false}) async {
     if (refresh) {
+      stopWatching(); // the filter may have changed; resubscribed once the list loads
       _filterParams = _filterParams.copyWith(index: 0);
       // Drop stale rows so a failed refetch never shows data for another filter.
       _histories = [];
@@ -76,6 +79,7 @@ class HistoryProvider extends ChangeNotifier {
       if (response.success && response.data != null) {
         _histories = response.data!.data;
         _total = response.data!.total;
+        if (refresh) _watchNew();
       } else {
         _errorMessage = response.message;
       }
@@ -87,6 +91,45 @@ class HistoryProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  StreamSubscription<HistoryItemModel>? _watchSub;
+  Timer? _watchRetry;
+
+  /// Prepends anomalies recorded after the newest one shown, for the current filter.
+  /// Resuming from that id also covers anomalies recorded while reconnecting.
+  void _watchNew() {
+    stopWatching();
+    final newestId = _histories.fold<int>(0, (m, h) => h.id > m ? h.id : m);
+    _watchSub = historyService.watchNew(_filterParams, afterId: newestId).listen(
+      (item) {
+        if (_histories.any((h) => h.id == item.id)) return;
+        _histories = [item, ..._histories];
+        _total++;
+        notifyListeners();
+      },
+      onError: (_) => _retryWatch(),
+      onDone: _retryWatch,
+      cancelOnError: true,
+    );
+  }
+
+  void _retryWatch() {
+    _watchSub = null;
+    _watchRetry = Timer(const Duration(seconds: 3), _watchNew);
+  }
+
+  void stopWatching() {
+    _watchRetry?.cancel();
+    _watchRetry = null;
+    _watchSub?.cancel();
+    _watchSub = null;
+  }
+
+  @override
+  void dispose() {
+    stopWatching();
+    super.dispose();
   }
 
   Future<void> loadMore() async {

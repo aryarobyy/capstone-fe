@@ -416,6 +416,7 @@ class _AreaScreenState extends State<AreaScreen> {
       label: Text(label),
       selected: isSelected,
       onSelected: (selected) {
+        if (index == _selectedChipIndex) return; // re-tap must not reset the feed
         setState(() {
           _selectedChipIndex = index;
         });
