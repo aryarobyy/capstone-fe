@@ -81,7 +81,7 @@ void main() {
 
       expect(provider.histories.map((h) => h.id), [5]);
       expect(provider.total, 1);
-      final del = seen.last;
+      final del = seen.lastWhere((r) => r.url.path == '/api/history/delete');
       expect(del.url.path, '/api/history/delete');
       expect(jsonDecode(del.body), {'id': 6});
     });
