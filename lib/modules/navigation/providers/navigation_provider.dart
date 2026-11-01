@@ -12,9 +12,11 @@ class NavigationProvider extends ChangeNotifier {
     }
   }
 
+  void navigateToDashboard() => setIndex(0);
   void navigateToHome() => setIndex(0);
+  void navigateToMonitoring() => setIndex(0);
   void navigateToRiwayat() => setIndex(1);
-  void navigateToMonitoring() => setIndex(2);
-  void navigateToArea() => setIndex(3);
-  void navigateToProfile() => setIndex(4);
+  void navigateToHistory() => setIndex(1);
+  void navigateToArea() => setIndex(2);
+  void navigateToProfile() => setIndex(3);
 }

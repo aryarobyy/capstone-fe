@@ -21,41 +21,24 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    // Default to "Dashboard" tab (index 2)
-    _controller = PersistentTabController(initialIndex: 2);
+    // Default to "Dashboard" tab (index 0)
+    _controller = PersistentTabController(initialIndex: 0);
   }
 
   List<Widget> _buildScreens() {
-    return [
-      _buildDummyScreen("Home"),
-      const RiwayatScreen(),
-      const DashboardScreen(), // Center Action Button
-      const AreaScreen(), // The actual Area screen
-      const ProfileView(),
+    return const [
+      DashboardScreen(),
+      RiwayatScreen(),
+      AreaScreen(),
+      ProfileView(),
     ];
-  }
-
-  Widget _buildDummyScreen(String title) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundCanvas,
-      body: Center(
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ),
-    );
   }
 
   List<PersistentBottomNavBarItem> _navBarsItems() {
     return [
       PersistentBottomNavBarItem(
-        icon: const Icon(Icons.home_outlined),
-        title: ("Home"),
+        icon: const Icon(Icons.dashboard_outlined),
+        title: ("Dashboard"),
         activeColorPrimary: AppColors.navSelected,
         inactiveColorPrimary: AppColors.navUnselected,
       ),
@@ -66,13 +49,7 @@ class _MainScreenState extends State<MainScreen> {
         inactiveColorPrimary: AppColors.navUnselected,
       ),
       PersistentBottomNavBarItem(
-        icon: const Icon(Icons.pie_chart, color: Colors.white),
-        title: ("Dashboard"),
-        activeColorPrimary: AppColors.accentGreen, // Green Circle
-        inactiveColorPrimary: AppColors.accentGreen,
-      ),
-      PersistentBottomNavBarItem(
-        icon: const Icon(Icons.eco),
+        icon: const Icon(Icons.eco_outlined),
         title: ("Area"),
         activeColorPrimary: AppColors.navSelected,
         inactiveColorPrimary: AppColors.navUnselected,
@@ -99,9 +76,12 @@ class _MainScreenState extends State<MainScreen> {
       hideNavigationBarWhenKeyboardAppears: true,
       padding: const EdgeInsets.only(top: 8),
       backgroundColor: AppColors.bottomNavBg,
+      decoration: const NavBarDecoration(
+        colorBehindNavBar: AppColors.bottomNavBg,
+      ),
       isVisible: true,
       confineToSafeArea: true,
-      navBarStyle: NavBarStyle.style15, // Style 15 gives the center notch FAB
+      navBarStyle: NavBarStyle.style6,
     );
   }
 }

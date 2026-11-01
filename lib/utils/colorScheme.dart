@@ -110,14 +110,14 @@ class AppColors {
   /// Warning Badge (Waspada): #FFE600
   static const Color badgeWarning = Color(0xFFFFE600);
   
-  /// Bottom Navigation Background: #F2EFEA
-  static const Color bottomNavBg = Color(0xFFF2EFEA);
+  /// Bottom Navigation Background: #3B9E59 (Matches "Tambah Area" button / areaAccent)
+  static const Color bottomNavBg = areaAccent;
   
-  /// Bottom Navigation Unselected: #B0BEC5
-  static const Color navUnselected = Color(0xFFB0BEC5);
+  /// Bottom Navigation Unselected: Soft White (75% Opacity)
+  static const Color navUnselected = Color(0xBFFFFFFF);
   
-  /// Bottom Navigation Default Selected: #8B5E34
-  static const Color navSelected = Color(0xFF8B5E34);
+  /// Bottom Navigation Default Selected: Pure White
+  static const Color navSelected = Color(0xFFFFFFFF);
 
   // ==========================================
   // 7. SENSOR ACTION TOKENS
