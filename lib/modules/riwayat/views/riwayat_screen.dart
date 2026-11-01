@@ -33,6 +33,47 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     super.dispose();
   }
 
+  Future<void> _deleteHistory(HistoryItemModel item) async {
+    final provider = _historyProvider;
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Hapus Riwayat"),
+        content: const Text(
+          "Hapus riwayat kejadian ini? Tindakan ini tidak dapat dibatalkan.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text("Batal"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              "Hapus",
+              style: TextStyle(color: AppColors.actionDelete),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final success = await provider.deleteHistory(item.id);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? "Riwayat berhasil dihapus"
+              : provider.errorMessage ?? "Gagal menghapus riwayat",
+        ),
+        backgroundColor: success ? AppColors.success : AppColors.error,
+      ),
+    );
+  }
+
   String _formatDateYMD(DateTime date) {
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
@@ -266,14 +307,29 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-            child: Text(
-              dateStr,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+            padding: const EdgeInsets.only(left: 12.0, right: 4.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  dateStr,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Hapus riwayat',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _deleteHistory(item),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    size: 20,
+                    color: AppColors.actionDelete,
+                  ),
+                ),
+              ],
             ),
           ),
           const Divider(height: 1, color: AppColors.border),

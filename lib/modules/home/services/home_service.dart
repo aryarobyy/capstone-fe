@@ -6,14 +6,12 @@ import '../../area/services/area_service.dart';
 import '../models/home_dashboard_model.dart';
 
 /// ponytail: the server has no dashboard endpoint, so this fans out to the
-/// list endpoints (7 small calls). Swap for one call if `/dashboard/summary`
+/// list endpoints (5 small calls). Swap for one call if `/dashboard/summary`
 /// ever ships.
 class HomeService {
   final RpcClient rpcClient;
 
   HomeService({required this.rpcClient});
-
-  static const _activeStatuses = ['FATAL', 'CRITICAL', 'WARNING'];
 
   Future<HomeDashboardModel> getDashboardSummary() async {
     final now = DateTime.now();
@@ -24,7 +22,9 @@ class HomeService {
       _page(ApiEndpoints.sensorList, {'limit': 1}, (j) => j),
       _history({'date': today, 'limit': 1}),
       _history({'limit': 5}),
-      for (final s in _activeStatuses) _history({'status': s, 'limit': 1}),
+      // Records never change after they are written, so status can't tell
+      // ongoing from past; the server's `active` filter can.
+      _history({'active': true, 'limit': 1}),
     ]);
 
     return HomeDashboardModel(
@@ -32,8 +32,7 @@ class HomeService {
       totalSensors: (r[1] as PaginatedData).total,
       totalAnomaliesToday: (r[2] as PaginatedData).total,
       recentEvents: (r[3] as PaginatedData<HistoryItemModel>).data,
-      activeAnomalies:
-          r.skip(4).fold(0, (sum, p) => sum + (p as PaginatedData).total),
+      activeAnomalies: (r[4] as PaginatedData).total,
     );
   }
 
