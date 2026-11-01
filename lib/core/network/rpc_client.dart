@@ -169,6 +169,14 @@ class RpcClient {
 
     final response = await _httpClient.send(request);
     if (response.statusCode != 200) {
+      // Refresh once so the caller's reconnect carries a fresh token.
+      if (response.statusCode == 401 &&
+          onUnauthorized != null &&
+          bearer != null &&
+          bearer.isNotEmpty &&
+          token == bearer) {
+        await onUnauthorized!();
+      }
       throw RpcException(
         statusCode: response.statusCode,
         message: 'Gagal membuka stream (${response.statusCode}).',

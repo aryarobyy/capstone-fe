@@ -9,6 +9,15 @@ class HistoryService {
 
   HistoryService({required this.rpcClient});
 
+  /// Anomalies matching [params] recorded after [afterId]; 0 means from now.
+  Stream<HistoryItemModel> watchNew(HistoryFilterParams params, {int afterId = 0}) =>
+      rpcClient
+          .stream(
+            procedure: ApiEndpoints.historyStream,
+            params: {...params.toJson(), 'after_id': afterId},
+          )
+          .map(HistoryItemModel.fromJson);
+
   Future<ApiResponse<PaginatedData<HistoryItemModel>>> getHistoryList(
     HistoryFilterParams params,
   ) async {

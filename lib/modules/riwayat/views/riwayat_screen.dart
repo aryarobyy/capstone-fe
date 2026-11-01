@@ -15,12 +15,22 @@ class RiwayatScreen extends StatefulWidget {
 }
 
 class _RiwayatScreenState extends State<RiwayatScreen> {
+  late final HistoryProvider _historyProvider;
+
   @override
   void initState() {
     super.initState();
+    _historyProvider = context.read<HistoryProvider>();
+    // A refresh also opens the live stream for new anomalies.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<HistoryProvider>().fetchHistories(refresh: true);
+      if (mounted) _historyProvider.fetchHistories(refresh: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _historyProvider.stopWatching();
+    super.dispose();
   }
 
   String _formatDateYMD(DateTime date) {
