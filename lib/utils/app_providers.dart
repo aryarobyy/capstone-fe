@@ -13,6 +13,8 @@ import '../modules/home/services/home_service.dart';
 import '../modules/monitoring/providers/monitoring_provider.dart';
 import '../modules/monitoring/services/monitoring_service.dart';
 import '../modules/navigation/providers/navigation_provider.dart';
+import '../modules/notifications/providers/notification_provider.dart';
+import '../modules/notifications/services/notification_service.dart';
 import '../modules/profile/providers/profile_provider.dart';
 import '../modules/profile/services/profile_service.dart';
 import '../modules/riwayat/providers/history_provider.dart';
@@ -86,6 +88,11 @@ class AppProviders {
       ),
       ChangeNotifierProvider<ProfileProvider>(
         create: (_) => ProfileProvider(profileService: profileService),
+      ),
+      ChangeNotifierProvider<NotificationProvider>(
+        create: (_) => NotificationProvider(
+          notificationService: NotificationService(rpcClient: rpcClient),
+        ),
       ),
     ];
   }

@@ -53,6 +53,11 @@ class AuthService {
     return (accessToken: access, refreshToken: next);
   }
 
+  Future<void> updateDevice(String token, String type) => rpcClient.call(
+        procedure: ApiEndpoints.authDeviceToken,
+        params: {'device_token': token, 'device_type': type},
+      );
+
   Future<ApiResponse<void>> logout() async {
     final responseMap = await rpcClient.call(
       procedure: ApiEndpoints.authLogout,

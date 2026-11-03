@@ -5,6 +5,8 @@ class ApiEndpoints {
   static const String authRegister = '/auth/register';
   static const String authLogout = '/auth/logout';
   static const String authRefresh = '/auth/refresh';
+  // Binds this session to a push token: {device_token, device_type}.
+  static const String authDeviceToken = '/auth/device-token';
 
   static const String historyList = '/history/list';
   static const String historyDetail = '/history/detail';
@@ -34,6 +36,10 @@ class ApiEndpoints {
   static const String sensorCreate = '/sensor/create';
   static const String sensorUpdate = '/sensor/update';
   static const String sensorDelete = '/sensor/delete';
+
+  // Standard envelope. read -> {id}; is_read is shared by all of a user's devices.
+  static const String notificationList = '/notifications/list';
+  static const String notificationRead = '/notifications/read';
 
   static const String userDetail = '/user/detail';
   static const String userUpdate = '/user/update';

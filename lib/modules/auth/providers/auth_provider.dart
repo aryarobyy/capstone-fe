@@ -86,7 +86,10 @@ class AuthProvider extends ChangeNotifier {
     _currentUser = user;
     _restoring = true;
     try {
-      if (await _refreshSession() != null) return true;
+      if (await _refreshSession() != null) {
+        unawaited(syncDevice());
+        return true;
+      }
     } finally {
       _restoring = false;
     }
@@ -96,6 +99,20 @@ class AuthProvider extends ChangeNotifier {
     _currentUser = null;
     notifyListeners();
     return false;
+  }
+
+  /// Binds this device's push token to the current session. Login sends it too,
+  /// but it can arrive empty (permission prompt pending, token not ready), which
+  /// leaves the device silently out of the fan-out; this is the retry, also run
+  /// on every restored session so a device never stays unregistered.
+  Future<void> syncDevice() async {
+    try {
+      final device = await deviceRegistration?.call();
+      if (device == null || !isAuthenticated) return;
+      await authService.updateDevice(device.token, device.type);
+    } catch (e) {
+      debugPrint('Push device registration failed: $e');
+    }
   }
 
   VoidCallback? onSessionExpired;
@@ -186,7 +203,8 @@ class AuthProvider extends ChangeNotifier {
       DeviceRegistration? device;
       try {
         device = await deviceRegistration?.call();
-      } catch (_) {
+      } catch (e) {
+        debugPrint('Push token unavailable at login: $e');
       }
       String? installationId;
       try {
@@ -209,13 +227,14 @@ class AuthProvider extends ChangeNotifier {
             await storage?.write(key: _kInstallation, value: newInstallation);
           } catch (_) {}
         }
-        if (!response.data!.deviceTokenRegistered) {
-          debugPrint('Login OK but device not registered for push '
-              '(token sent: ${device != null}).');
-        }
         _accessToken = response.data!.accessToken;
         _refreshToken = response.data!.refreshToken;
         rpcClient.token = _accessToken;
+        if (!response.data!.deviceTokenRegistered) {
+          debugPrint('Login OK but device not registered for push '
+              '(token sent: ${device != null}); retrying.');
+          unawaited(syncDevice());
+        }
         _currentUser = response.data!.user;
         _isLoading = false;
         await _persist();

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../../utils/colorScheme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../auth/views/login_view.dart';
+import '../../notifications/views/notification_view.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/profile_header_card.dart';
 import 'edit_profile_view.dart';
@@ -78,7 +79,9 @@ class _ProfileViewState extends State<ProfileView> {
                 MenuItemCard(
                   icon: Icons.notifications_none,
                   label: 'Notifikasi',
-                  onTap: () {},
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NotificationView()),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 MenuItemCard(
